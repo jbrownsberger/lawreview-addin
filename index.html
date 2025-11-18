@@ -201,7 +201,7 @@
                 const newComment = {
                   id: newCommentId,
                   location: newCommentLocation,
-                  author: "Admin",
+                  author: "",
                   timestamp: new Date().toISOString().split('T')[0] + " " + 
                              new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                   items: [
@@ -283,31 +283,38 @@
               return;
             }
 
+            console.log("Attempting to delete comment:", commentId);
+
             try {
+              // First remove from state
+              const updatedComments = comments.filter(c => c.id !== commentId);
+              setComments(updatedComments);
+              
+              // Then update Word document
               await Word.run(async (context) => {
                 // Remove the content control from document
                 const contentControls = context.document.contentControls;
                 contentControls.load("items");
                 await context.sync();
                 
+                console.log("Found", contentControls.items.length, "content controls");
+                
                 for (let i = 0; i < contentControls.items.length; i++) {
                   const cc = contentControls.items[i];
                   cc.load("tag");
                   await context.sync();
                   
+                  console.log("Checking content control with tag:", cc.tag);
+                  
                   if (cc.tag === `lawreview-${commentId}`) {
+                    console.log("Found matching content control, deleting...");
                     cc.delete(false); // false = keep the text, just remove the control
+                    await context.sync();
                     break;
                   }
                 }
                 
-                await context.sync();
-                
-                // Remove from state
-                const updatedComments = comments.filter(c => c.id !== commentId);
-                setComments(updatedComments);
-                
-                // Save immediately
+                // Save to document properties
                 const properties = context.document.properties;
                 const customProps = properties.customProperties;
                 const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
@@ -316,11 +323,21 @@
                 if (!commentsProp.isNullObject) {
                   commentsProp.value = JSON.stringify(updatedComments);
                   await context.sync();
+                  console.log("Successfully saved updated comments to Word");
+                } else {
+                  console.log("Creating new custom property for comments");
+                  customProps.add("lawReviewComments", JSON.stringify(updatedComments));
+                  await context.sync();
                 }
+                
+                alert("Comment deleted successfully!");
               });
             } catch (error) {
               console.error("Error deleting comment:", error);
+              console.error("Error details:", error.message, error.stack);
               alert("Error deleting comment: " + error.message);
+              // Reload comments to ensure UI is in sync
+              loadCommentsFromWord();
             }
           }
 
@@ -576,8 +593,6 @@
                             </span>
                             <span className="mx-2 text-gray-400">|</span>
                             <span className="text-gray-700">{comment.location}</span>
-                            <span className="mx-2 text-gray-400">|</span>
-                            <span className="text-gray-600 text-sm">{comment.author}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 ml-3">
