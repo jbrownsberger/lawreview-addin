@@ -25,6 +25,9 @@
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
+        .content-control-highlight {
+            background-color: #E3F2FD;
+        }
     </style>
 </head>
 <body>
@@ -32,41 +35,18 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
-        
-        // Sample data - in production this would load from Word document
-        const initialComments = [
-          {
-            id: "125A",
-            location: "Footnote 125",
-            author: "Admin",
-            timestamp: "2024-11-15 10:30",
-            items: [
-              { id: "1", admin: "My suggested change to the ATL quote brackets is in a different comment.", proof: "See above for my response to ATL edits", galley: "Agree" },
-              { id: "2", admin: "Now that more empty footnotes have been added, the proper supra note is 120.", proof: "agree implemented.", galley: "Agree" },
-              { id: "3", admin: "Page 550 is an accurate pincite.", proof: "agree.", galley: "Agree" },
-              { id: "10a", admin: "", proof: "don't think 06:00 AM is necessary—just 06:00", galley: "Agree per GB 1824." },
-              { id: "10b", admin: "", proof: "my BB has 'at' for timestamps under 18.2.", galley: "Disagree. I'm not seeing 'at' in BB 18.2.2(c) or GB 1822-24." }
-            ]
-          },
-          {
-            id: "42B",
-            location: "Footnote 42",
-            author: "Admin",
-            timestamp: "2024-11-14 14:20",
-            items: [
-              { id: "1", admin: "Per BB 3.2, this citation needs a pincite to the specific page.", proof: "Disagree - this is a general reference to the entire work per BB 3.2(a).", galley: "Agree with Proof. No pincite needed here." },
-              { id: "2", admin: "Author name should be in small caps per BB 2.1", proof: "Implemented", galley: "" }
-            ]
-          }
-        ];
 
         function CommentViewer() {
-          const [expandedComments, setExpandedComments] = useState(new Set(['125A']));
+          const [expandedComments, setExpandedComments] = useState(new Set());
           const [collapsedColumns, setCollapsedColumns] = useState(new Set());
           const [searchTerm, setSearchTerm] = useState('');
           const [filterEditor, setFilterEditor] = useState('All');
-          const [comments, setComments] = useState(initialComments);
+          const [comments, setComments] = useState([]);
           const [officeReady, setOfficeReady] = useState(false);
+          const [loading, setLoading] = useState(true);
+          const [showCreateDialog, setShowCreateDialog] = useState(false);
+          const [newCommentId, setNewCommentId] = useState('');
+          const [newCommentLocation, setNewCommentLocation] = useState('');
 
           useEffect(() => {
             // Initialize Office
@@ -78,27 +58,59 @@
             });
           }, []);
 
+          // PHASE 1: Load comments from Word document
           async function loadCommentsFromWord() {
+            setLoading(true);
             try {
               await Word.run(async (context) => {
-                // In production, load from Custom XML Parts
-                // For now, using sample data
-                console.log("Loading comments from Word document...");
-                // const settings = context.document.properties.customProperties;
-                // settings.load("items");
-                // await context.sync();
+                // Load from document properties
+                const properties = context.document.properties;
+                const customProps = properties.customProperties;
+                
+                const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
+                commentsProp.load("value");
+                await context.sync();
+                
+                if (!commentsProp.isNullObject) {
+                  const loadedComments = JSON.parse(commentsProp.value);
+                  setComments(loadedComments);
+                  // Auto-expand first comment
+                  if (loadedComments.length > 0) {
+                    setExpandedComments(new Set([loadedComments[0].id]));
+                  }
+                } else {
+                  // No comments yet
+                  setComments([]);
+                }
               });
             } catch (error) {
               console.error("Error loading comments:", error);
+              alert("Error loading comments: " + error.message);
+            } finally {
+              setLoading(false);
             }
           }
 
+          // PHASE 1: Save comments to Word document
           async function saveCommentsToWord() {
             try {
               await Word.run(async (context) => {
-                // In production, save to Custom XML Parts
-                console.log("Saving comments to Word document...");
-                alert("Comments saved to document!");
+                const properties = context.document.properties;
+                const customProps = properties.customProperties;
+                
+                const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
+                await context.sync();
+                
+                const commentsJson = JSON.stringify(comments);
+                
+                if (commentsProp.isNullObject) {
+                  customProps.add("lawReviewComments", commentsJson);
+                } else {
+                  commentsProp.value = commentsJson;
+                }
+                
+                await context.sync();
+                alert("Comments saved successfully!");
               });
             } catch (error) {
               console.error("Error saving comments:", error);
@@ -106,20 +118,209 @@
             }
           }
 
+          // PHASE 2: Create new comment from selection
+          async function createNewCommentFromSelection() {
+            try {
+              await Word.run(async (context) => {
+                const range = context.document.getSelection();
+                range.load("text");
+                await context.sync();
+                
+                if (range.text.length === 0) {
+                  alert("Please select some text first!");
+                  return;
+                }
+                
+                // Get the location description
+                let locationText = range.text.substring(0, 50);
+                if (range.text.length > 50) {
+                  locationText += "...";
+                }
+                
+                // Determine what kind of location this is
+                const paragraphs = context.document.body.paragraphs;
+                paragraphs.load("items");
+                await context.sync();
+                
+                // Check if selection is in a footnote
+                const footnotes = context.document.body.footnotes;
+                footnotes.load("items");
+                await context.sync();
+                
+                let locationDescription = `Text: "${locationText}"`;
+                
+                // Try to find if it's in a footnote
+                for (let i = 0; i < footnotes.items.length; i++) {
+                  const footnote = footnotes.items[i];
+                  const footnoteRange = footnote.body.getRange();
+                  footnoteRange.load("text");
+                  await context.sync();
+                  
+                  if (footnoteRange.text.includes(range.text)) {
+                    locationDescription = `Footnote ${i + 1}`;
+                    break;
+                  }
+                }
+                
+                setNewCommentLocation(locationDescription);
+                setShowCreateDialog(true);
+              });
+            } catch (error) {
+              console.error("Error creating comment:", error);
+              alert("Error creating comment: " + error.message);
+            }
+          }
+
+          // PHASE 2: Finalize creating the comment
+          async function finalizeCreateComment() {
+            if (!newCommentId.trim()) {
+              alert("Please enter a comment ID!");
+              return;
+            }
+
+            // Check if ID already exists
+            if (comments.some(c => c.id === newCommentId)) {
+              alert("A comment with this ID already exists!");
+              return;
+            }
+
+            try {
+              await Word.run(async (context) => {
+                const range = context.document.getSelection();
+                
+                // Create a content control at this location
+                const contentControl = range.insertContentControl();
+                contentControl.tag = `lawreview-${newCommentId}`;
+                contentControl.title = `Comment ${newCommentId}`;
+                contentControl.appearance = "Tags";
+                contentControl.color = "#E3F2FD";
+                
+                await context.sync();
+                
+                // Add the new comment to state
+                const newComment = {
+                  id: newCommentId,
+                  location: newCommentLocation,
+                  author: "Admin",
+                  timestamp: new Date().toISOString().split('T')[0] + " " + 
+                             new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                  items: [
+                    { id: "1", admin: "", proof: "", galley: "" }
+                  ]
+                };
+                
+                const updatedComments = [...comments, newComment];
+                setComments(updatedComments);
+                
+                // Auto-expand the new comment
+                const newExpanded = new Set(expandedComments);
+                newExpanded.add(newCommentId);
+                setExpandedComments(newExpanded);
+                
+                // Save immediately
+                const properties = context.document.properties;
+                const customProps = properties.customProperties;
+                const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
+                await context.sync();
+                
+                const commentsJson = JSON.stringify(updatedComments);
+                
+                if (commentsProp.isNullObject) {
+                  customProps.add("lawReviewComments", commentsJson);
+                } else {
+                  commentsProp.value = commentsJson;
+                }
+                
+                await context.sync();
+                
+                // Close dialog
+                setShowCreateDialog(false);
+                setNewCommentId('');
+                setNewCommentLocation('');
+                
+                alert("Comment created successfully!");
+              });
+            } catch (error) {
+              console.error("Error finalizing comment:", error);
+              alert("Error creating comment: " + error.message);
+            }
+          }
+
+          // PHASE 3: Jump to comment location in document
           async function jumpToComment(commentId) {
             try {
               await Word.run(async (context) => {
-                // Search for the comment marker in the document
-                const searchResults = context.document.body.search(commentId);
-                searchResults.load("items");
+                const contentControls = context.document.contentControls;
+                contentControls.load("items");
                 await context.sync();
                 
-                if (searchResults.items.length > 0) {
-                  searchResults.items[0].select();
+                let found = false;
+                for (let i = 0; i < contentControls.items.length; i++) {
+                  const cc = contentControls.items[i];
+                  cc.load("tag");
+                  await context.sync();
+                  
+                  if (cc.tag === `lawreview-${commentId}`) {
+                    cc.select();
+                    found = true;
+                    break;
+                  }
+                }
+                
+                if (!found) {
+                  alert("Could not find this comment in the document. It may have been deleted.");
                 }
               });
             } catch (error) {
               console.error("Error jumping to comment:", error);
+              alert("Error navigating to comment: " + error.message);
+            }
+          }
+
+          // Delete a comment entirely
+          async function deleteComment(commentId) {
+            if (!confirm(`Are you sure you want to delete comment ${commentId}? This will also remove the marker from the document.`)) {
+              return;
+            }
+
+            try {
+              await Word.run(async (context) => {
+                // Remove the content control from document
+                const contentControls = context.document.contentControls;
+                contentControls.load("items");
+                await context.sync();
+                
+                for (let i = 0; i < contentControls.items.length; i++) {
+                  const cc = contentControls.items[i];
+                  cc.load("tag");
+                  await context.sync();
+                  
+                  if (cc.tag === `lawreview-${commentId}`) {
+                    cc.delete(false); // false = keep the text, just remove the control
+                    break;
+                  }
+                }
+                
+                await context.sync();
+                
+                // Remove from state
+                const updatedComments = comments.filter(c => c.id !== commentId);
+                setComments(updatedComments);
+                
+                // Save immediately
+                const properties = context.document.properties;
+                const customProps = properties.customProperties;
+                const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
+                await context.sync();
+                
+                if (!commentsProp.isNullObject) {
+                  commentsProp.value = JSON.stringify(updatedComments);
+                  await context.sync();
+                }
+              });
+            } catch (error) {
+              console.error("Error deleting comment:", error);
+              alert("Error deleting comment: " + error.message);
             }
           }
 
@@ -129,6 +330,7 @@
             return comments.filter(comment => {
               const matchesSearch = searchTerm === '' || 
                 comment.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                comment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 comment.items.some(item => 
                   item.admin?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   item.proof?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -226,18 +428,36 @@
             </svg>
           );
 
+          const Trash = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          );
+
           return (
             <div className="h-screen flex flex-col bg-gray-50">
               {/* Header */}
               <div className="bg-blue-600 text-white p-4 shadow-lg">
                 <div className="flex items-center justify-between mb-3">
                   <h1 className="text-xl font-bold">Law Review Comments</h1>
-                  <button 
-                    onClick={saveCommentsToWord}
-                    className="bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded text-sm transition"
-                  >
-                    Save to Word
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={createNewCommentFromSelection}
+                      className="bg-green-600 hover:bg-green-700 px-3 py-2 rounded text-sm transition flex items-center gap-1"
+                      disabled={!officeReady}
+                    >
+                      <Plus />
+                      New Comment
+                    </button>
+                    <button 
+                      onClick={saveCommentsToWord}
+                      className="bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded text-sm transition"
+                      disabled={!officeReady}
+                    >
+                      Save to Word
+                    </button>
+                  </div>
                 </div>
                 
                 {/* Search and Filter Bar */}
@@ -266,9 +486,69 @@
                 </div>
               </div>
 
+              {/* Create Comment Dialog */}
+              {showCreateDialog && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+                    <h2 className="text-xl font-bold mb-4">Create New Comment</h2>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Comment ID (e.g., "125A", "42B")
+                      </label>
+                      <input
+                        type="text"
+                        value={newCommentId}
+                        onChange={(e) => setNewCommentId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="125A"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Location
+                      </label>
+                      <input
+                        type="text"
+                        value={newCommentLocation}
+                        onChange={(e) => setNewCommentLocation(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => {
+                          setShowCreateDialog(false);
+                          setNewCommentId('');
+                          setNewCommentLocation('');
+                        }}
+                        className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={finalizeCreateComment}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                      >
+                        Create Comment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Comments List */}
               <div className="flex-1 overflow-y-auto p-4">
-                {filteredComments.length === 0 ? (
+                {loading ? (
+                  <div className="text-center text-gray-500 mt-8">
+                    Loading comments...
+                  </div>
+                ) : comments.length === 0 ? (
+                  <div className="text-center text-gray-500 mt-8">
+                    <p className="text-lg mb-2">No comments yet!</p>
+                    <p className="text-sm">Select some text in your document and click "New Comment" to get started.</p>
+                  </div>
+                ) : filteredComments.length === 0 ? (
                   <div className="text-center text-gray-500 mt-8">
                     No comments found matching your search.
                   </div>
@@ -298,8 +578,20 @@
                             <span className="text-gray-600 text-sm">{comment.author}</span>
                           </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-500">
+                            {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteComment(comment.id);
+                            }}
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 rounded transition"
+                            title="Delete comment"
+                          >
+                            <Trash />
+                          </button>
                         </div>
                       </div>
 
@@ -435,8 +727,9 @@
 
               {/* Footer */}
               <div className="bg-gray-100 border-t border-gray-300 px-4 py-2 text-sm text-gray-600">
-                {officeReady ? "✓ Connected to Word" : "Initializing..."} • 
-                Showing {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''}
+                {officeReady ? "✓ Connected to Word" : "⚠ Waiting for Word..."} • 
+                Showing {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''} • 
+                Click ID to jump to location
               </div>
             </div>
           );
