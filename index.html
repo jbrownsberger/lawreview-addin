@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Law Review Comment Viewer</title>
+    
+    <!-- Office JavaScript API -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX transformation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+        
+        // Sample data - in production this would load from Word document
+        const initialComments = [
+          {
+            id: "125A",
+            location: "Footnote 125",
+            author: "Admin",
+            timestamp: "2024-11-15 10:30",
+            items: [
+              { id: "1", admin: "My suggested change to the ATL quote brackets is in a different comment.", proof: "See above for my response to ATL edits", galley: "Agree" },
+              { id: "2", admin: "Now that more empty footnotes have been added, the proper supra note is 120.", proof: "agree implemented.", galley: "Agree" },
+              { id: "3", admin: "Page 550 is an accurate pincite.", proof: "agree.", galley: "Agree" },
+              { id: "10a", admin: "", proof: "don't think 06:00 AM is necessary—just 06:00", galley: "Agree per GB 1824." },
+              { id: "10b", admin: "", proof: "my BB has 'at' for timestamps under 18.2.", galley: "Disagree. I'm not seeing 'at' in BB 18.2.2(c) or GB 1822-24." }
+            ]
+          },
+          {
+            id: "42B",
+            location: "Footnote 42",
+            author: "Admin",
+            timestamp: "2024-11-14 14:20",
+            items: [
+              { id: "1", admin: "Per BB 3.2, this citation needs a pincite to the specific page.", proof: "Disagree - this is a general reference to the entire work per BB 3.2(a).", galley: "Agree with Proof. No pincite needed here." },
+              { id: "2", admin: "Author name should be in small caps per BB 2.1", proof: "Implemented", galley: "" }
+            ]
+          }
+        ];
+
+        function CommentViewer() {
+          const [expandedComments, setExpandedComments] = useState(new Set(['125A']));
+          const [collapsedColumns, setCollapsedColumns] = useState(new Set());
+          const [searchTerm, setSearchTerm] = useState('');
+          const [filterEditor, setFilterEditor] = useState('All');
+          const [comments, setComments] = useState(initialComments);
+          const [officeReady, setOfficeReady] = useState(false);
+
+          useEffect(() => {
+            // Initialize Office
+            Office.onReady((info) => {
+              if (info.host === Office.HostType.Word) {
+                setOfficeReady(true);
+                loadCommentsFromWord();
+              }
+            });
+          }, []);
+
+          async function loadCommentsFromWord() {
+            try {
+              await Word.run(async (context) => {
+                // In production, load from Custom XML Parts
+                // For now, using sample data
+                console.log("Loading comments from Word document...");
+                // const settings = context.document.properties.customProperties;
+                // settings.load("items");
+                // await context.sync();
+              });
+            } catch (error) {
+              console.error("Error loading comments:", error);
+            }
+          }
+
+          async function saveCommentsToWord() {
+            try {
+              await Word.run(async (context) => {
+                // In production, save to Custom XML Parts
+                console.log("Saving comments to Word document...");
+                alert("Comments saved to document!");
+              });
+            } catch (error) {
+              console.error("Error saving comments:", error);
+              alert("Error saving comments: " + error.message);
+            }
+          }
+
+          async function jumpToComment(commentId) {
+            try {
+              await Word.run(async (context) => {
+                // Search for the comment marker in the document
+                const searchResults = context.document.body.search(commentId);
+                searchResults.load("items");
+                await context.sync();
+                
+                if (searchResults.items.length > 0) {
+                  searchResults.items[0].select();
+                }
+              });
+            } catch (error) {
+              console.error("Error jumping to comment:", error);
+            }
+          }
+
+          const allEditors = ['All', 'Admin', 'Proof', 'Galley'];
+
+          const filteredComments = useMemo(() => {
+            return comments.filter(comment => {
+              const matchesSearch = searchTerm === '' || 
+                comment.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                comment.items.some(item => 
+                  item.admin?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  item.proof?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  item.galley?.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+              
+              const matchesEditor = filterEditor === 'All' || 
+                comment.author === filterEditor;
+              
+              return matchesSearch && matchesEditor;
+            });
+          }, [searchTerm, filterEditor, comments]);
+
+          const toggleExpand = (commentId) => {
+            const newExpanded = new Set(expandedComments);
+            if (newExpanded.has(commentId)) {
+              newExpanded.delete(commentId);
+            } else {
+              newExpanded.add(commentId);
+            }
+            setExpandedComments(newExpanded);
+          };
+
+          const toggleColumn = (columnName) => {
+            const newCollapsed = new Set(collapsedColumns);
+            if (newCollapsed.has(columnName)) {
+              newCollapsed.delete(columnName);
+            } else {
+              newCollapsed.add(columnName);
+            }
+            setCollapsedColumns(newCollapsed);
+          };
+
+          const addRowAfter = (commentId, afterIndex) => {
+            setComments(comments.map(comment => {
+              if (comment.id === commentId) {
+                const newItems = [...comment.items];
+                newItems.splice(afterIndex + 1, 0, {
+                  id: "",
+                  admin: "",
+                  proof: "",
+                  galley: ""
+                });
+                return { ...comment, items: newItems };
+              }
+              return comment;
+            }));
+          };
+
+          const updateCell = (commentId, itemIndex, column, value) => {
+            setComments(comments.map(comment => {
+              if (comment.id === commentId) {
+                const newItems = [...comment.items];
+                newItems[itemIndex] = { ...newItems[itemIndex], [column]: value };
+                return { ...comment, items: newItems };
+              }
+              return comment;
+            }));
+          };
+
+          const deleteRow = (commentId, itemIndex) => {
+            setComments(comments.map(comment => {
+              if (comment.id === commentId) {
+                const newItems = comment.items.filter((_, idx) => idx !== itemIndex);
+                return { ...comment, items: newItems };
+              }
+              return comment;
+            }));
+          };
+
+          // SVG Icons
+          const SearchIcon = () => (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+          );
+
+          const ChevronDown = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          );
+
+          const ChevronUp = () => (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="18 15 12 9 6 15"></polyline>
+            </svg>
+          );
+
+          const Plus = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          );
+
+          return (
+            <div className="h-screen flex flex-col bg-gray-50">
+              {/* Header */}
+              <div className="bg-blue-600 text-white p-4 shadow-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h1 className="text-xl font-bold">Law Review Comments</h1>
+                  <button 
+                    onClick={saveCommentsToWord}
+                    className="bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded text-sm transition"
+                  >
+                    Save to Word
+                  </button>
+                </div>
+                
+                {/* Search and Filter Bar */}
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <div className="absolute left-3 top-2.5 text-blue-300">
+                      <SearchIcon />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search comments..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 rounded bg-blue-700 text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </div>
+                  <select 
+                    value={filterEditor}
+                    onChange={(e) => setFilterEditor(e.target.value)}
+                    className="px-3 py-2 rounded bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  >
+                    {allEditors.map(editor => (
+                      <option key={editor} value={editor}>{editor}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Comments List */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {filteredComments.length === 0 ? (
+                  <div className="text-center text-gray-500 mt-8">
+                    No comments found matching your search.
+                  </div>
+                ) : (
+                  filteredComments.map(comment => (
+                    <div key={comment.id} className="mb-4 bg-white rounded-lg shadow border border-gray-200">
+                      {/* Comment Header */}
+                      <div 
+                        className="p-3 bg-gray-100 border-b border-gray-200 cursor-pointer hover:bg-gray-200 transition flex items-center justify-between"
+                        onClick={() => toggleExpand(comment.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
+                          <div>
+                            <span 
+                              className="font-bold text-blue-600 cursor-pointer hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                jumpToComment(comment.id);
+                              }}
+                            >
+                              {comment.id}
+                            </span>
+                            <span className="mx-2 text-gray-400">|</span>
+                            <span className="text-gray-700">{comment.location}</span>
+                            <span className="mx-2 text-gray-400">|</span>
+                            <span className="text-gray-600 text-sm">{comment.author}</span>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+
+                      {/* Expanded Items Table */}
+                      {expandedComments.has(comment.id) && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead className="bg-gray-50 border-b-2 border-gray-300">
+                              <tr>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 border-r border-gray-300 w-24">
+                                  Item #
+                                </th>
+                                {[
+                                  { key: 'admin', label: 'Admin' },
+                                  { key: 'proof', label: 'Proof' },
+                                  { key: 'galley', label: 'Galley' }
+                                ].map(({ key, label }) => (
+                                  !collapsedColumns.has(key) && (
+                                    <th 
+                                      key={key}
+                                      className="px-3 py-2 text-left text-xs font-semibold text-gray-700 border-r border-gray-300 cursor-pointer hover:bg-gray-100 transition group"
+                                      style={{ minWidth: '300px' }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleColumn(key);
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <span>{label}</span>
+                                        <ChevronUp />
+                                      </div>
+                                    </th>
+                                  )
+                                ))}
+                                {collapsedColumns.size > 0 && (
+                                  <th className="px-2 py-2 text-center text-xs font-semibold text-gray-500 border-r border-gray-300">
+                                    <div className="flex flex-col gap-1">
+                                      {Array.from(collapsedColumns).map(col => (
+                                        <button
+                                          key={col}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleColumn(col);
+                                          }}
+                                          className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1 transition"
+                                        >
+                                          <ChevronDown />
+                                          {col.charAt(0).toUpperCase() + col.slice(1)}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </th>
+                                )}
+                                <th className="px-2 py-2 w-12"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {comment.items.map((item, idx) => (
+                                <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                  <td className="px-3 py-2 text-sm font-bold text-blue-700 border-r border-gray-200 align-top">
+                                    <input
+                                      type="text"
+                                      value={item.id}
+                                      onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
+                                      className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1"
+                                      placeholder="ID"
+                                    />
+                                  </td>
+                                  {!collapsedColumns.has('admin') && (
+                                    <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-200 align-top">
+                                      <textarea
+                                        value={item.admin}
+                                        onChange={(e) => updateCell(comment.id, idx, 'admin', e.target.value)}
+                                        className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 resize-none"
+                                        rows={Math.max(2, Math.ceil((item.admin?.length || 0) / 50))}
+                                        placeholder="—"
+                                      />
+                                    </td>
+                                  )}
+                                  {!collapsedColumns.has('proof') && (
+                                    <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-200 align-top">
+                                      <textarea
+                                        value={item.proof}
+                                        onChange={(e) => updateCell(comment.id, idx, 'proof', e.target.value)}
+                                        className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 resize-none"
+                                        rows={Math.max(2, Math.ceil((item.proof?.length || 0) / 50))}
+                                        placeholder="—"
+                                      />
+                                    </td>
+                                  )}
+                                  {!collapsedColumns.has('galley') && (
+                                    <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-200 align-top">
+                                      <textarea
+                                        value={item.galley}
+                                        onChange={(e) => updateCell(comment.id, idx, 'galley', e.target.value)}
+                                        className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 resize-none"
+                                        rows={Math.max(2, Math.ceil((item.galley?.length || 0) / 50))}
+                                        placeholder="—"
+                                      />
+                                    </td>
+                                  )}
+                                  {collapsedColumns.size > 0 && (
+                                    <td className="border-r border-gray-200"></td>
+                                  )}
+                                  <td className="px-2 py-2 text-center">
+                                    <div className="flex flex-col gap-1">
+                                      <button
+                                        onClick={() => addRowAfter(comment.id, idx)}
+                                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded transition"
+                                        title="Add row below"
+                                      >
+                                        <Plus />
+                                      </button>
+                                      <button
+                                        onClick={() => deleteRow(comment.id, idx)}
+                                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition text-xs"
+                                        title="Delete row"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="bg-gray-100 border-t border-gray-300 px-4 py-2 text-sm text-gray-600">
+                {officeReady ? "✓ Connected to Word" : "Initializing..."} • 
+                Showing {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          );
+        }
+
+        ReactDOM.render(<CommentViewer />, document.getElementById('root'));
+    </script>
+</body>
+</html>
