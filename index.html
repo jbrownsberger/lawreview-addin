@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Law Review Comment Viewer - v15</title>
+    <title>Law Review Comment Viewer - v16</title>
     
     <!-- Office JavaScript API -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -41,7 +41,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 15 loaded!");
+        console.log("Law Review Add-in Version 16 loaded!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -566,12 +566,15 @@
               <div className="bg-blue-600 text-white p-4 shadow-lg">
                 <div className="flex flex-col gap-3 mb-3">
                   <div className="flex items-center justify-between">
-                    <h1 className="text-xl font-bold">Law Review Comments v15</h1>
+                    <h1 className="text-xl font-bold">Law Review Comments v16</h1>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button 
-                      onClick={() => {
-                        alert("TEST BUTTON WORKS!");
+                      onClick={async () => {
+                        await Word.run(async (context) => {
+                          alert("TEST BUTTON WORKS!");
+                          await context.sync();
+                        });
                       }}
                       className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm font-bold"
                       style={{ minWidth: '100px', cursor: 'pointer' }}
@@ -588,20 +591,59 @@
                       New Comment
                     </button>
                     <button 
-                      onClick={() => {
-                        alert("Delete button clicked! Comments: " + comments.length);
-                        if (comments.length === 0) {
-                          alert("No comments to delete!");
-                          return;
-                        }
-                        const commentIds = comments.map(c => c.id).join(', ');
-                        alert("Available comments: " + commentIds);
-                        const commentToDelete = prompt(`Enter comment ID to delete:\n${commentIds}`);
-                        alert("You entered: " + commentToDelete);
-                        if (commentToDelete) {
-                          alert("About to call handleDeleteClick");
-                          handleDeleteClick(commentToDelete);
-                        }
+                      onClick={async () => {
+                        await Word.run(async (context) => {
+                          alert("Delete button clicked! Comments: " + comments.length);
+                          
+                          if (comments.length === 0) {
+                            alert("No comments to delete!");
+                            return;
+                          }
+                          
+                          const commentIds = comments.map(c => c.id).join(', ');
+                          alert("Available comments: " + commentIds);
+                          
+                          const commentToDelete = prompt(`Enter comment ID to delete:\n${commentIds}`);
+                          alert("You entered: " + commentToDelete);
+                          
+                          if (commentToDelete) {
+                            // Perform delete directly here
+                            const updatedComments = comments.filter(c => c.id !== commentToDelete);
+                            setComments(updatedComments);
+                            
+                            // Find and delete content control
+                            const contentControls = context.document.contentControls;
+                            contentControls.load("items");
+                            await context.sync();
+                            
+                            for (let i = 0; i < contentControls.items.length; i++) {
+                              const cc = contentControls.items[i];
+                              cc.load("tag");
+                              await context.sync();
+                              
+                              if (cc.tag === `lawreview-${commentToDelete}`) {
+                                cc.delete(false);
+                                await context.sync();
+                                break;
+                              }
+                            }
+                            
+                            // Save to document
+                            const properties = context.document.properties;
+                            const customProps = properties.customProperties;
+                            const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
+                            await context.sync();
+                            
+                            if (!commentsProp.isNullObject) {
+                              commentsProp.value = JSON.stringify(updatedComments);
+                            } else {
+                              customProps.add("lawReviewComments", JSON.stringify(updatedComments));
+                            }
+                            
+                            await context.sync();
+                            alert("Comment deleted successfully!");
+                          }
+                        });
                       }}
                       className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm transition flex items-center gap-1"
                       style={{ minWidth: '160px', cursor: 'pointer' }}
