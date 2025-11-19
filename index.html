@@ -39,8 +39,8 @@
             });
           }, []);
 
-          // SIMPLE add function - NO Word.run
-          function handleAdd() {
+          // Add function WITH Word.run
+          async function handleAdd() {
             setMessage("Add button clicked!");
             
             if (!newId.trim()) {
@@ -48,14 +48,24 @@
               return;
             }
             
-            const newComment = { id: newId, text: "New comment" };
-            setComments([...comments, newComment]);
-            setMessage(`✓ Added comment ${newId}`);
-            setNewId("");
+            try {
+              await Word.run(async (context) => {
+                // This would create a content control in real version
+                // For now, just testing that Word.run works
+                await context.sync();
+                
+                const newComment = { id: newId, text: "New comment (with Word.run)" };
+                setComments([...comments, newComment]);
+                setMessage(`✓ Added comment ${newId} (Word.run succeeded!)`);
+                setNewId("");
+              });
+            } catch (error) {
+              setMessage(`✗ Error: ${error.message}`);
+            }
           }
 
-          // SIMPLE delete function - NO Word.run
-          function handleDelete() {
+          // Delete function WITH Word.run
+          async function handleDelete() {
             setMessage("Delete button clicked!");
             
             if (!deleteId.trim()) {
@@ -69,9 +79,19 @@
               return;
             }
             
-            setComments(comments.filter(c => c.id !== deleteId));
-            setMessage(`✓ Deleted comment ${deleteId}`);
-            setDeleteId("");
+            try {
+              await Word.run(async (context) => {
+                // This would delete content control in real version
+                // For now, just testing that Word.run works
+                await context.sync();
+                
+                setComments(comments.filter(c => c.id !== deleteId));
+                setMessage(`✓ Deleted comment ${deleteId} (Word.run succeeded!)`);
+                setDeleteId("");
+              });
+            } catch (error) {
+              setMessage(`✗ Error: ${error.message}`);
+            }
           }
 
           return (
