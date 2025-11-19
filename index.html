@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Law Review Comment Viewer - v11</title>
+    <title>Law Review Comment Viewer - v12</title>
     
     <!-- Office JavaScript API -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -41,7 +41,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 11 loaded!");
+        console.log("Law Review Add-in Version 12 loaded!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -565,7 +565,7 @@
               {/* Header */}
               <div className="bg-blue-600 text-white p-4 shadow-lg">
                 <div className="flex items-center justify-between mb-3">
-                  <h1 className="text-xl font-bold">Law Review Comments v11</h1>
+                  <h1 className="text-xl font-bold">Law Review Comments v12</h1>
                   <div className="flex gap-2">
                     <button 
                       onClick={createNewCommentFromSelection}
@@ -680,10 +680,10 @@
                 ) : (
                   filteredComments.map(comment => (
                     <div key={comment.id} className="mb-4 bg-white rounded-lg shadow border border-gray-200">
-                      {/* Comment Header - COMPLETELY REWRITTEN */}
+                      {/* Comment Header - SIMPLIFIED DELETE BUTTON */}
                       <div className="p-3 bg-gray-100 border-b border-gray-200 flex items-center justify-between gap-3">
                         <div 
-                          className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-gray-200 -m-3 p-3 mr-3 rounded-l transition"
+                          className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-gray-200 p-2 rounded-l transition"
                           onClick={() => toggleExpand(comment.id)}
                         >
                           {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
@@ -705,14 +705,19 @@
                           <span className="text-sm text-gray-500 whitespace-nowrap">
                             {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteClick(comment.id)}
-                            className="text-red-600 hover:text-white hover:bg-red-600 p-2 rounded transition border-2 border-red-400 hover:border-red-600"
-                            title="Delete entire comment"
+                          <a
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteClick(comment.id);
+                              return false;
+                            }}
+                            className="inline-flex items-center justify-center text-white bg-red-600 hover:bg-red-700 px-3 py-2 rounded transition font-bold text-sm"
+                            title="Delete comment"
                           >
-                            <Trash />
-                          </button>
+                            DELETE
+                          </a>
                         </div>
                       </div>
 
