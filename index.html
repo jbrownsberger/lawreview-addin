@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Law Review Comment Viewer - v14</title>
+    <title>Law Review Comment Viewer - v15</title>
     
     <!-- Office JavaScript API -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -41,7 +41,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 14 loaded!");
+        console.log("Law Review Add-in Version 15 loaded!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -564,47 +564,56 @@
             <div className="h-screen flex flex-col bg-gray-50">
               {/* Header */}
               <div className="bg-blue-600 text-white p-4 shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <h1 className="text-xl font-bold">Law Review Comments v14</h1>
-                  <div className="flex gap-2">
+                <div className="flex flex-col gap-3 mb-3">
+                  <div className="flex items-center justify-between">
+                    <h1 className="text-xl font-bold">Law Review Comments v15</h1>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button 
+                      onClick={() => {
+                        alert("TEST BUTTON WORKS!");
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm font-bold"
+                      style={{ minWidth: '100px', cursor: 'pointer' }}
+                    >
+                      TEST
+                    </button>
                     <button 
                       onClick={createNewCommentFromSelection}
-                      className="bg-green-600 hover:bg-green-700 px-3 py-2 rounded text-sm transition flex items-center gap-1"
+                      className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition flex items-center gap-1"
                       disabled={!officeReady}
+                      style={{ minWidth: '140px', cursor: 'pointer' }}
                     >
                       <Plus />
                       New Comment
                     </button>
                     <button 
                       onClick={() => {
-                        alert("TEST BUTTON CLICKED!");
-                      }}
-                      className="bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded text-sm transition"
-                    >
-                      TEST
-                    </button>
-                    <button 
-                      onClick={() => {
+                        alert("Delete button clicked! Comments: " + comments.length);
                         if (comments.length === 0) {
                           alert("No comments to delete!");
                           return;
                         }
                         const commentIds = comments.map(c => c.id).join(', ');
-                        const commentToDelete = prompt(`Enter comment ID to delete (${commentIds}):`);
+                        alert("Available comments: " + commentIds);
+                        const commentToDelete = prompt(`Enter comment ID to delete:\n${commentIds}`);
+                        alert("You entered: " + commentToDelete);
                         if (commentToDelete) {
+                          alert("About to call handleDeleteClick");
                           handleDeleteClick(commentToDelete);
                         }
                       }}
-                      className="bg-red-600 hover:bg-red-700 px-3 py-2 rounded text-sm transition flex items-center gap-1"
-                      disabled={!officeReady || comments.length === 0}
+                      className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm transition flex items-center gap-1"
+                      style={{ minWidth: '160px', cursor: 'pointer' }}
                     >
                       <Trash />
                       Delete Comment
                     </button>
                     <button 
                       onClick={saveCommentsToWord}
-                      className="bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded text-sm transition"
+                      className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded text-sm transition"
                       disabled={!officeReady}
+                      style={{ minWidth: '120px', cursor: 'pointer' }}
                     >
                       Save to Word
                     </button>
