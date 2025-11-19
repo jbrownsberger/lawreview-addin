@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Law Review Comment Viewer - v12</title>
+    <title>Law Review Comment Viewer - v13</title>
     
     <!-- Office JavaScript API -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -41,7 +41,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 12 loaded!");
+        console.log("Law Review Add-in Version 13 loaded!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -565,7 +565,7 @@
               {/* Header */}
               <div className="bg-blue-600 text-white p-4 shadow-lg">
                 <div className="flex items-center justify-between mb-3">
-                  <h1 className="text-xl font-bold">Law Review Comments v12</h1>
+                  <h1 className="text-xl font-bold">Law Review Comments v13</h1>
                   <div className="flex gap-2">
                     <button 
                       onClick={createNewCommentFromSelection}
@@ -574,6 +574,24 @@
                     >
                       <Plus />
                       New Comment
+                    </button>
+                    <button 
+                      onClick={() => {
+                        if (comments.length === 0) {
+                          alert("No comments to delete!");
+                          return;
+                        }
+                        const commentIds = comments.map(c => c.id).join(', ');
+                        const commentToDelete = prompt(`Enter comment ID to delete (${commentIds}):`);
+                        if (commentToDelete) {
+                          handleDeleteClick(commentToDelete);
+                        }
+                      }}
+                      className="bg-red-600 hover:bg-red-700 px-3 py-2 rounded text-sm transition flex items-center gap-1"
+                      disabled={!officeReady || comments.length === 0}
+                    >
+                      <Trash />
+                      Delete Comment
                     </button>
                     <button 
                       onClick={saveCommentsToWord}
