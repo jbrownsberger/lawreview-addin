@@ -170,6 +170,9 @@
           const [showCreateDialog, setShowCreateDialog] = useState(false);
           const [newCommentId, setNewCommentId] = useState('');
           const [newCommentLocation, setNewCommentLocation] = useState('');
+          const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+          const [deleteCommentId, setDeleteCommentId] = useState('');
+          const [debugMessage, setDebugMessage] = useState('');
 
           useEffect(() => {
             Office.onReady((info) => {
