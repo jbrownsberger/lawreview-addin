@@ -351,19 +351,29 @@
             try {
               await Word.run(async (context) => {
                 const contentControls = context.document.contentControls;
-                // Batch-load tags for all controls before inspecting
-                contentControls.load("items/tag");
+                contentControls.load("items");
+                contentControls.items.load("tag");
                 await context.sync();
-                
+
                 let found = false;
-                for (let i = 0; i < contentControls.items.length; i++) {
-                  const cc = contentControls.items[i];
+                for (const cc of contentControls.items) {
                   if (cc.tag === `lawreview-${commentId}`) {
                     cc.select();
                     found = true;
                     break;
                   }
                 }
+
+                if (!found) {
+                  alert("Could not find this comment in the document. It may have been deleted.");
+                }
+              });
+            } catch (error) {
+              console.error("Error jumping to comment:", error);
+              alert("Error navigating to comment: " + error.message);
+            }
+          }
+
                 
                 if (!found) {
                   alert("Could not find this comment in the document. It may have been deleted.");
@@ -397,30 +407,47 @@ This will remove the comment from the list and remove the marker from your docum
           async function performDelete(commentId) {
             try {
               console.log("Starting delete process for:", commentId);
-              
-              // First, update the UI immediately
+
               const updatedComments = comments.filter(c => c.id !== commentId);
-              console.log("Updated comments list:", updatedComments);
               setComments(updatedComments);
-              
-              // Then update Word document
+
               await Word.run(async (context) => {
-                console.log("Searching for content controls...");
                 const contentControls = context.document.contentControls;
-                // Load tag for all content controls at once (fixed)
-                contentControls.load("items/tag");
+
+                contentControls.load("items");
+                contentControls.items.load("tag");
                 await context.sync();
-                
-                console.log("Found", contentControls.items.length, "content controls");
-                
-                for (let i = 0; i < contentControls.items.length; i++) {
-                  const cc = contentControls.items[i];
+
+                for (const cc of contentControls.items) {
                   if (cc.tag === `lawreview-${commentId}`) {
-                    console.log("Found matching control, deleting...", cc.tag);
+                    console.log("Deleting CC", cc.tag);
                     cc.delete(false);
                     break;
                   }
                 }
+
+                await context.sync();
+
+                const props = context.document.properties.customProperties;
+                const prop = props.getItemOrNullObject("lawReviewComments");
+                await context.sync();
+
+                if (prop.isNullObject) {
+                  props.add("lawReviewComments", JSON.stringify(updatedComments));
+                } else {
+                  prop.value = JSON.stringify(updatedComments);
+                }
+
+                await context.sync();
+                alert("Comment deleted successfully!");
+              });
+            } catch (error) {
+              console.error("Error during delete:", error);
+              alert("Error deleting comment: " + error.message);
+              loadCommentsFromWord();
+            }
+          }
+
                 
                 // Save updated list to document properties
                 console.log("Saving to document properties...");
