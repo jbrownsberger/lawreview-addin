@@ -2,98 +2,14 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Law Review Comment Viewer - v13</title>
-    
-    <!-- Office JavaScript API -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
-    
-    <!-- React and ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel for JSX transformation -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        .content-control-highlight {
-            background-color: #E3F2FD;
-        }
-        /* Rich text editor styles */
-        [contenteditable] {
-            outline: none;
-        }
-        [contenteditable]:focus {
-            background-color: #f9fafb;
-        }
-    </style>
+    <script>
+        Office.onReady();
+    </script>
 </head>
 <body>
-    <div id="root"></div>
-
-    <script type="text/babel">
-        console.log("Law Review Add-in Version 13 loaded!");
-        
-        const { useState, useEffect, useMemo, useRef } = React;
-
-        // Rich text cell component with formatting toolbar
-        function RichTextCell({ value, onChange, placeholder }) {
-          const [showToolbar, setShowToolbar] = useState(false);
-          const editorRef = useRef(null);
-          const toolbarRef = useRef(null);
-          
-          const applyFormat = (command) => {
-            document.execCommand(command, false, null);
-            editorRef.current?.focus();
-          };
-          
-          const handleInput = () => {
-            if (editorRef.current) {
-              onChange(editorRef.current.innerHTML);
-            }
-          };
-          
-          const handleFocus = () => {
-            setShowToolbar(true);
-          };
-          
-          const handleBlur = (e) => {
-            // Don't hide toolbar if clicking on toolbar buttons
-            if (toolbarRef.current && toolbarRef.current.contains(e.relatedTarget)) {
-              return;
-            }
-            setShowToolbar(false);
-          };
-          
-          // Set initial content
-          useEffect(() => {
-            if (editorRef.current && editorRef.current.innerHTML !== value) {
-              editorRef.current.innerHTML = value || '';
-            }
-          }, [value]);
-          
-          return (
-            <div className="relative">
-              {showToolbar && (
-                <div 
-                  ref={toolbarRef}
-                  className="absolute -top-10 left-0 bg-white border border-gray-300 rounded shadow-lg flex gap-1 p-1 z-50"
-                  style={{ minWidth: '150px' }}
-                >
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { 
-                      e.preventDefault(); 
-                      applyFormat('bold'); 
+</body>
+</html>                      applyFormat('bold'); 
                     }}
                     className="px-2 py-1 hover:bg-blue-100 rounded font-bold text-sm border border-gray-200"
                     title="Bold (Cmd/Ctrl+B)"
