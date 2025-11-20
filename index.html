@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Law Review Comment Viewer - v20 FIXED</title>
+    <title>Law Review Comment Viewer - v21</title>
     
     <!-- Office JavaScript API -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -41,7 +41,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 17 loaded!");
+        console.log("Law Review Add-in Version 21 - Single delete button with confirmation");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -170,9 +170,6 @@
           const [showCreateDialog, setShowCreateDialog] = useState(false);
           const [newCommentId, setNewCommentId] = useState('');
           const [newCommentLocation, setNewCommentLocation] = useState('');
-          const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-          const [deleteCommentId, setDeleteCommentId] = useState('');
-          const [debugMessage, setDebugMessage] = useState('');
 
           useEffect(() => {
             Office.onReady((info) => {
@@ -380,40 +377,22 @@
             }
           }
 
-          // COMPLETELY REWRITTEN DELETE FUNCTION
-          function handleDeleteClick(commentId) {
-            console.log("DELETE CLICKED FOR:", commentId);
-            
-            const confirmDelete = window.confirm(
-              `Delete comment ${commentId}?\n\nThis will remove the comment from the list and remove the marker from your document.`
+          // Delete comment function - called from button next to each comment
+          async function deleteCommentById(commentId) {
+            const confirmDelete = confirm(
+              `Are you sure you want to delete comment ${commentId}?\n\nThis will remove it from the table and remove the highlight from your document.`
             );
             
             if (!confirmDelete) {
-              console.log("Delete cancelled by user");
               return;
             }
             
-            console.log("User confirmed delete, proceeding...");
-            performDelete(commentId);
-          }
-
-          async function performDelete(commentId) {
             try {
-              console.log("Starting delete process for:", commentId);
-              
-              // First, update the UI immediately
-              const updatedComments = comments.filter(c => c.id !== commentId);
-              console.log("Updated comments list:", updatedComments);
-              setComments(updatedComments);
-              
-              // Then update Word document
               await Word.run(async (context) => {
-                console.log("Searching for content controls...");
+                // Delete content control from document
                 const contentControls = context.document.contentControls;
                 contentControls.load("items");
                 await context.sync();
-                
-                console.log("Found", contentControls.items.length, "content controls");
                 
                 for (let i = 0; i < contentControls.items.length; i++) {
                   const cc = contentControls.items[i];
@@ -421,15 +400,17 @@
                   await context.sync();
                   
                   if (cc.tag === `lawreview-${commentId}`) {
-                    console.log("Found matching control, deleting...");
-                    cc.delete(false);
+                    cc.delete(false); // false = keep the text
                     await context.sync();
                     break;
                   }
                 }
                 
-                // Save updated list to document
-                console.log("Saving to document properties...");
+                // Remove from state
+                const updatedComments = comments.filter(c => c.id !== commentId);
+                setComments(updatedComments);
+                
+                // Save to document properties
                 const properties = context.document.properties;
                 const customProps = properties.customProperties;
                 const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
@@ -442,13 +423,10 @@
                 }
                 
                 await context.sync();
-                console.log("Delete completed successfully!");
-                alert("Comment deleted successfully!");
+                alert(`Comment ${commentId} deleted successfully!`);
               });
             } catch (error) {
-              console.error("Error during delete:", error);
               alert("Error deleting comment: " + error.message);
-              loadCommentsFromWord();
             }
           }
 
@@ -569,54 +547,38 @@
               <div className="bg-blue-600 text-white p-4 shadow-lg">
                 <div className="flex flex-col gap-3 mb-3">
                   <div className="flex items-center justify-between">
-                    <h1 className="text-xl font-bold">Law Review Comments v17</h1>
+                    <h1 className="text-xl font-bold">Law Review Comments v21</h1>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button 
-                      onClick={() => {
-                        setDebugMessage("TEST button clicked at " + new Date().toLocaleTimeString());
+                      onClick={async () => {
+                        if (!officeReady) {
+                          alert("Please wait for Office to finish loading");
+                          return;
+                        }
+                        await createNewCommentFromSelection();
                       }}
-                      className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm font-bold"
-                      style={{ minWidth: '100px', cursor: 'pointer' }}
-                    >
-                      TEST
-                    </button>
-                    <button 
-                      onClick={createNewCommentFromSelection}
                       className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition flex items-center gap-1"
-                      disabled={!officeReady}
-                      style={{ minWidth: '140px', cursor: 'pointer' }}
+                      style={{ cursor: 'pointer' }}
                     >
                       <Plus />
                       New Comment
                     </button>
                     <button 
-                      onClick={() => {
-                        setDebugMessage("Delete button clicked!");
-                        setShowDeleteDialog(true);
+                      onClick={async () => {
+                        if (!officeReady) {
+                          alert("Please wait for Office to finish loading");
+                          return;
+                        }
+                        await saveCommentsToWord();
                       }}
-                      className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-sm transition flex items-center gap-1"
-                      style={{ minWidth: '160px', cursor: 'pointer' }}
-                    >
-                      <Trash />
-                      Delete Comment
-                    </button>
-                    <button 
-                      onClick={saveCommentsToWord}
                       className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded text-sm transition"
-                      disabled={!officeReady}
-                      style={{ minWidth: '120px', cursor: 'pointer' }}
+                      style={{ cursor: 'pointer' }}
                     >
                       Save to Word
                     </button>
                   </div>
                 </div>
-                
-                {debugMessage && (
-                  <div className="bg-yellow-200 text-yellow-900 px-4 py-2 rounded">
-                    DEBUG: {debugMessage}
-                  </div>
-                )}
                 
                 {/* Search and Filter Bar */}
                 <div className="flex gap-2">
@@ -643,97 +605,6 @@
                   </select>
                 </div>
               </div>
-
-              {/* Delete Comment Dialog */}
-              {showDeleteDialog && (
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                  <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-                    <h2 className="text-xl font-bold mb-4">Delete Comment</h2>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Available comments: {comments.map(c => c.id).join(', ')}
-                      </label>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Enter comment ID to delete:
-                      </label>
-                      <input
-                        type="text"
-                        value={deleteCommentId}
-                        onChange={(e) => setDeleteCommentId(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="e.g., 125A"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => {
-                          setShowDeleteDialog(false);
-                          setDeleteCommentId('');
-                        }}
-                        className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!deleteCommentId.trim()) {
-                            setDebugMessage("Please enter a comment ID!");
-                            return;
-                          }
-                          
-                          try {
-                            await Word.run(async (context) => {
-                              // Delete from state
-                              const updatedComments = comments.filter(c => c.id !== deleteCommentId);
-                              setComments(updatedComments);
-                              
-                              // Delete content control
-                              const contentControls = context.document.contentControls;
-                              contentControls.load("items");
-                              await context.sync();
-                              
-                              for (let i = 0; i < contentControls.items.length; i++) {
-                                const cc = contentControls.items[i];
-                                cc.load("tag");
-                                await context.sync();
-                                
-                                if (cc.tag === `lawreview-${deleteCommentId}`) {
-                                  cc.delete(false);
-                                  await context.sync();
-                                  break;
-                                }
-                              }
-                              
-                              // Save to document
-                              const properties = context.document.properties;
-                              const customProps = properties.customProperties;
-                              const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
-                              await context.sync();
-                              
-                              if (!commentsProp.isNullObject) {
-                                commentsProp.value = JSON.stringify(updatedComments);
-                              } else {
-                                customProps.add("lawReviewComments", JSON.stringify(updatedComments));
-                              }
-                              
-                              await context.sync();
-                              setDebugMessage(`Comment ${deleteCommentId} deleted successfully!`);
-                              setShowDeleteDialog(false);
-                              setDeleteCommentId('');
-                            });
-                          } catch (error) {
-                            setDebugMessage("Error: " + error.message);
-                          }
-                        }}
-                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Create Comment Dialog */}
               {showCreateDialog && (
@@ -804,7 +675,7 @@
                 ) : (
                   filteredComments.map(comment => (
                     <div key={comment.id} className="mb-4 bg-white rounded-lg shadow border border-gray-200">
-                      {/* Comment Header - SIMPLIFIED DELETE BUTTON */}
+                      {/* Comment Header */}
                       <div className="p-3 bg-gray-100 border-b border-gray-200 flex items-center justify-between gap-3">
                         <div 
                           className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-gray-200 p-2 rounded-l transition"
@@ -829,19 +700,16 @@
                           <span className="text-sm text-gray-500 whitespace-nowrap">
                             {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
                           </span>
-                          <a
-                            href="#"
+                          <button
                             onClick={(e) => {
-                              e.preventDefault();
                               e.stopPropagation();
-                              handleDeleteClick(comment.id);
-                              return false;
+                              deleteCommentById(comment.id);
                             }}
-                            className="inline-flex items-center justify-center text-white bg-red-600 hover:bg-red-700 px-3 py-2 rounded transition font-bold text-sm"
-                            title="Delete comment"
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-semibold transition"
+                            style={{ cursor: 'pointer' }}
                           >
-                            DELETE
-                          </a>
+                            Delete
+                          </button>
                         </div>
                       </div>
 
