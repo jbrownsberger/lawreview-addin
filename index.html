@@ -375,6 +375,17 @@
           }
 
                 
+                if (!found) {
+                  alert("Could not find this comment in the document. It may have been deleted.");
+                }
+              });
+            } catch (error) {
+              console.error("Error jumping to comment:", error);
+              alert("Error navigating to comment: " + error.message);
+            }
+          }
+
+          // COMPLETELY REWRITTEN DELETE FUNCTION (Batched property load)
           function handleDeleteClick(commentId) {
             console.log("DELETE CLICKED FOR:", commentId);
             
@@ -397,23 +408,85 @@ This will remove the comment from the list and remove the marker from your docum
             try {
               console.log("Starting delete process for:", commentId);
 
+              // First, update the UI immediately
               const updatedComments = comments.filter(c => c.id !== commentId);
               setComments(updatedComments);
 
               await Word.run(async (context) => {
                 const contentControls = context.document.contentControls;
 
+                // Load items and request both tag and title for better debugging
                 contentControls.load("items");
-                contentControls.items.load("tag");
+                contentControls.items.load("tag,title");
                 await context.sync();
 
-                for (const cc of contentControls.items) {
+                console.log("Total content controls in document:", contentControls.items.length);
+
+                let foundCc = null;
+                // Log all tags/titles to help diagnose missing tags
+                for (let i = 0; i < contentControls.items.length; i++) {
+                  const cc = contentControls.items[i];
+                  // Defensive: some hosts may still give undefined - coerce to string for logging
+                  console.log(`CC[${i}] tag=`, cc.tag, " title=", cc.title);
+
                   if (cc.tag === `lawreview-${commentId}`) {
-                    console.log("Deleting CC", cc.tag);
-                    cc.delete(false);
+                    foundCc = cc;
                     break;
                   }
                 }
+
+                if (!foundCc) {
+                  // If not found, try a slower per-item load (older hosts)
+                  console.log("Did not find content control by batch tag. Trying per-item load...");
+                  for (let i = 0; i < contentControls.items.length; i++) {
+                    const cc = contentControls.items[i];
+                    try {
+                      cc.load("tag,title");
+                      await context.sync();
+                      console.log(`(per-item) CC[${i}] tag=`, cc.tag, " title=", cc.title);
+                      if (cc.tag === `lawreview-${commentId}`) {
+                        foundCc = cc;
+                        break;
+                      }
+                    } catch (e) {
+                      console.warn("per-item load failed for index", i, e);
+                    }
+                  }
+                }
+
+                if (!foundCc) {
+                  console.warn("No content control found with tag lawreview-" + commentId);
+                  alert("Could not find the matching content control in the document.
+Check that the comment marker still exists and that its tag is exactly: lawreview-" + commentId);
+                } else {
+                  console.log("Found matching control, deleting (not removing text):", foundCc.tag);
+                  // delete(false) so the highlighted text remains
+                  foundCc.delete(false);
+                }
+
+                await context.sync();
+
+                // Save updated list to document properties
+                const props = context.document.properties.customProperties;
+                const prop = props.getItemOrNullObject("lawReviewComments");
+                await context.sync();
+
+                if (prop.isNullObject) {
+                  props.add("lawReviewComments", JSON.stringify(updatedComments));
+                } else {
+                  prop.value = JSON.stringify(updatedComments);
+                }
+
+                await context.sync();
+                alert("Comment deleted (UI updated). If the marker remained, see console for details.");
+              });
+            } catch (error) {
+              console.error("Error during delete:", error);
+              alert("Error deleting comment: " + error.message);
+              loadCommentsFromWord();
+            }
+          }
+
 
                 await context.sync();
 
@@ -428,6 +501,31 @@ This will remove the comment from the list and remove the marker from your docum
                 }
 
                 await context.sync();
+                alert("Comment deleted successfully!");
+              });
+            } catch (error) {
+              console.error("Error during delete:", error);
+              alert("Error deleting comment: " + error.message);
+              loadCommentsFromWord();
+            }
+          }
+
+                
+                // Save updated list to document properties
+                console.log("Saving to document properties...");
+                const properties = context.document.properties;
+                const customProps = properties.customProperties;
+                const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
+                await context.sync();
+                
+                if (!commentsProp.isNullObject) {
+                  commentsProp.value = JSON.stringify(updatedComments);
+                } else {
+                  customProps.add("lawReviewComments", JSON.stringify(updatedComments));
+                }
+                
+                await context.sync();
+                console.log("Delete completed successfully!");
                 alert("Comment deleted successfully!");
               });
             } catch (error) {
