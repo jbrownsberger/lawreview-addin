@@ -375,17 +375,6 @@
           }
 
                 
-                if (!found) {
-                  alert("Could not find this comment in the document. It may have been deleted.");
-                }
-              });
-            } catch (error) {
-              console.error("Error jumping to comment:", error);
-              alert("Error navigating to comment: " + error.message);
-            }
-          }
-
-          // COMPLETELY REWRITTEN DELETE FUNCTION (Batched property load)
           function handleDeleteClick(commentId) {
             console.log("DELETE CLICKED FOR:", commentId);
             
@@ -439,31 +428,6 @@ This will remove the comment from the list and remove the marker from your docum
                 }
 
                 await context.sync();
-                alert("Comment deleted successfully!");
-              });
-            } catch (error) {
-              console.error("Error during delete:", error);
-              alert("Error deleting comment: " + error.message);
-              loadCommentsFromWord();
-            }
-          }
-
-                
-                // Save updated list to document properties
-                console.log("Saving to document properties...");
-                const properties = context.document.properties;
-                const customProps = properties.customProperties;
-                const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
-                await context.sync();
-                
-                if (!commentsProp.isNullObject) {
-                  commentsProp.value = JSON.stringify(updatedComments);
-                } else {
-                  customProps.add("lawReviewComments", JSON.stringify(updatedComments));
-                }
-                
-                await context.sync();
-                console.log("Delete completed successfully!");
                 alert("Comment deleted successfully!");
               });
             } catch (error) {
