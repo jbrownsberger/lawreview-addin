@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Law Review Comment Viewer - v21</title>
+    <title>Law Review Comment Viewer - v13 (Fixed Delete)</title>
     
     <!-- Office JavaScript API -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -41,7 +41,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 21 - Single delete button with confirmation");
+        console.log("Law Review Add-in Version 13 loaded!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -352,20 +352,28 @@
               await Word.run(async (context) => {
                 const contentControls = context.document.contentControls;
                 contentControls.load("items");
+                contentControls.items.load("tag");
                 await context.sync();
-                
+
                 let found = false;
-                for (let i = 0; i < contentControls.items.length; i++) {
-                  const cc = contentControls.items[i];
-                  cc.load("tag");
-                  await context.sync();
-                  
+                for (const cc of contentControls.items) {
                   if (cc.tag === `lawreview-${commentId}`) {
                     cc.select();
                     found = true;
                     break;
                   }
                 }
+
+                if (!found) {
+                  alert("Could not find this comment in the document. It may have been deleted.");
+                }
+              });
+            } catch (error) {
+              console.error("Error jumping to comment:", error);
+              alert("Error navigating to comment: " + error.message);
+            }
+          }
+
                 
                 if (!found) {
                   alert("Could not find this comment in the document. It may have been deleted.");
@@ -377,40 +385,72 @@
             }
           }
 
-          // Delete comment function - called from button next to each comment
-          async function deleteCommentById(commentId) {
-            const confirmDelete = confirm(
-              `Are you sure you want to delete comment ${commentId}?\n\nThis will remove it from the table and remove the highlight from your document.`
+          // COMPLETELY REWRITTEN DELETE FUNCTION (Batched property load)
+          function handleDeleteClick(commentId) {
+            console.log("DELETE CLICKED FOR:", commentId);
+            
+            const confirmDelete = window.confirm(
+              `Delete comment ${commentId}?
+
+This will remove the comment from the list and remove the marker from your document.`
             );
             
             if (!confirmDelete) {
+              console.log("Delete cancelled by user");
               return;
             }
             
+            console.log("User confirmed delete, proceeding...");
+            performDelete(commentId);
+          }
+
+          async function performDelete(commentId) {
             try {
+              console.log("Starting delete process for:", commentId);
+
+              const updatedComments = comments.filter(c => c.id !== commentId);
+              setComments(updatedComments);
+
               await Word.run(async (context) => {
-                // Delete content control from document
                 const contentControls = context.document.contentControls;
+
                 contentControls.load("items");
+                contentControls.items.load("tag");
                 await context.sync();
-                
-                for (let i = 0; i < contentControls.items.length; i++) {
-                  const cc = contentControls.items[i];
-                  cc.load("tag");
-                  await context.sync();
-                  
+
+                for (const cc of contentControls.items) {
                   if (cc.tag === `lawreview-${commentId}`) {
-                    cc.delete(false); // false = keep the text
-                    await context.sync();
+                    console.log("Deleting CC", cc.tag);
+                    cc.delete(false);
                     break;
                   }
                 }
+
+                await context.sync();
+
+                const props = context.document.properties.customProperties;
+                const prop = props.getItemOrNullObject("lawReviewComments");
+                await context.sync();
+
+                if (prop.isNullObject) {
+                  props.add("lawReviewComments", JSON.stringify(updatedComments));
+                } else {
+                  prop.value = JSON.stringify(updatedComments);
+                }
+
+                await context.sync();
+                alert("Comment deleted successfully!");
+              });
+            } catch (error) {
+              console.error("Error during delete:", error);
+              alert("Error deleting comment: " + error.message);
+              loadCommentsFromWord();
+            }
+          }
+
                 
-                // Remove from state
-                const updatedComments = comments.filter(c => c.id !== commentId);
-                setComments(updatedComments);
-                
-                // Save to document properties
+                // Save updated list to document properties
+                console.log("Saving to document properties...");
                 const properties = context.document.properties;
                 const customProps = properties.customProperties;
                 const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
@@ -423,10 +463,13 @@
                 }
                 
                 await context.sync();
-                alert(`Comment ${commentId} deleted successfully!`);
+                console.log("Delete completed successfully!");
+                alert("Comment deleted successfully!");
               });
             } catch (error) {
+              console.error("Error during delete:", error);
               alert("Error deleting comment: " + error.message);
+              loadCommentsFromWord();
             }
           }
 
@@ -545,35 +588,21 @@
             <div className="h-screen flex flex-col bg-gray-50">
               {/* Header */}
               <div className="bg-blue-600 text-white p-4 shadow-lg">
-                <div className="flex flex-col gap-3 mb-3">
-                  <div className="flex items-center justify-between">
-                    <h1 className="text-xl font-bold">Law Review Comments v21</h1>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h1 className="text-xl font-bold">Law Review Comments v13</h1>
+                  <div className="flex gap-2">
                     <button 
-                      onClick={async () => {
-                        if (!officeReady) {
-                          alert("Please wait for Office to finish loading");
-                          return;
-                        }
-                        await createNewCommentFromSelection();
-                      }}
-                      className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition flex items-center gap-1"
-                      style={{ cursor: 'pointer' }}
+                      onClick={createNewCommentFromSelection}
+                      className="bg-green-600 hover:bg-green-700 px-3 py-2 rounded text-sm transition flex items-center gap-1"
+                      disabled={!officeReady}
                     >
                       <Plus />
                       New Comment
                     </button>
                     <button 
-                      onClick={async () => {
-                        if (!officeReady) {
-                          alert("Please wait for Office to finish loading");
-                          return;
-                        }
-                        await saveCommentsToWord();
-                      }}
-                      className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded text-sm transition"
-                      style={{ cursor: 'pointer' }}
+                      onClick={saveCommentsToWord}
+                      className="bg-blue-700 hover:bg-blue-800 px-3 py-2 rounded text-sm transition"
+                      disabled={!officeReady}
                     >
                       Save to Word
                     </button>
@@ -675,10 +704,10 @@
                 ) : (
                   filteredComments.map(comment => (
                     <div key={comment.id} className="mb-4 bg-white rounded-lg shadow border border-gray-200">
-                      {/* Comment Header */}
+                      {/* Comment Header - COMPLETELY REWRITTEN */}
                       <div className="p-3 bg-gray-100 border-b border-gray-200 flex items-center justify-between gap-3">
                         <div 
-                          className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-gray-200 p-2 rounded-l transition"
+                          className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-gray-200 -m-3 p-3 mr-3 rounded-l transition"
                           onClick={() => toggleExpand(comment.id)}
                         >
                           {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
@@ -701,14 +730,12 @@
                             {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
                           </span>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteCommentById(comment.id);
-                            }}
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-semibold transition"
-                            style={{ cursor: 'pointer' }}
+                            type="button"
+                            onClick={() => handleDeleteClick(comment.id)}
+                            className="text-red-600 hover:text-white hover:bg-red-600 p-2 rounded transition border-2 border-red-400 hover:border-red-600"
+                            title="Delete entire comment"
                           >
-                            Delete
+                            <Trash />
                           </button>
                         </div>
                       </div>
