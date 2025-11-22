@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title>Law Review Comment Viewer - v26 AUTO-SYNC</title>
+    <title>Law Review Comment Viewer - v27 POLISHED</title>
     
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,63 +20,73 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 26 - Auto-sync with Word comments!");
+        console.log("Law Review Add-in Version 27 - Polished UI!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Rich text cell component
-        function RichTextCell({ value, onChange, placeholder }) {
-          const [showToolbar, setShowToolbar] = useState(false);
+        // Rich text cell component - FIXED apostrophe bug
+        function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column }) {
           const editorRef = useRef(null);
-          const toolbarRef = useRef(null);
+          const [localValue, setLocalValue] = useState(value);
           
-          const applyFormat = (command) => {
-            document.execCommand(command, false, null);
-            editorRef.current?.focus();
-          };
-          
-          const handleInput = () => {
-            if (editorRef.current) {
-              onChange(editorRef.current.innerHTML);
-            }
-          };
-          
-          const handleFocus = () => setShowToolbar(true);
-          const handleBlur = (e) => {
-            if (toolbarRef.current && toolbarRef.current.contains(e.relatedTarget)) {
-              return;
-            }
-            setShowToolbar(false);
-          };
-          
+          // Only update local value when prop changes from outside
           useEffect(() => {
-            if (editorRef.current && editorRef.current.innerHTML !== value) {
-              editorRef.current.innerHTML = value || '';
+            if (value !== localValue && document.activeElement !== editorRef.current) {
+              setLocalValue(value);
+              if (editorRef.current) {
+                editorRef.current.innerHTML = value || '';
+              }
             }
           }, [value]);
           
+          const handleInput = () => {
+            if (editorRef.current) {
+              const newValue = editorRef.current.innerHTML;
+              setLocalValue(newValue);
+              onChange(newValue);
+            }
+          };
+          
+          const handleKeyDown = (e) => {
+            // Tab key = move to cell below
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              const nextCell = findNextCell(commentId, itemIndex, column);
+              if (nextCell) {
+                nextCell.focus();
+              }
+            }
+          };
+          
+          const findNextCell = (cId, iIdx, col) => {
+            // Find the next cell below in the same column
+            const allCells = document.querySelectorAll(`[data-cell="${col}"]`);
+            let foundCurrent = false;
+            for (let cell of allCells) {
+              if (foundCurrent) return cell;
+              if (cell === editorRef.current) foundCurrent = true;
+            }
+            return null;
+          };
+          
           return (
-            <div className="relative">
-              {showToolbar && (
-                <div 
-                  ref={toolbarRef}
-                  className="absolute -top-10 left-0 bg-white border border-gray-300 rounded shadow-lg flex gap-1 p-1 z-50"
-                >
-                  <button type="button" onMouseDown={(e) => { e.preventDefault(); applyFormat('bold'); }}
-                    className="px-2 py-1 hover:bg-blue-100 rounded font-bold text-sm border border-gray-200" title="Bold">B</button>
-                  <button type="button" onMouseDown={(e) => { e.preventDefault(); applyFormat('italic'); }}
-                    className="px-2 py-1 hover:bg-blue-100 rounded italic text-sm border border-gray-200" title="Italic">I</button>
-                  <button type="button" onMouseDown={(e) => { e.preventDefault(); applyFormat('underline'); }}
-                    className="px-2 py-1 hover:bg-blue-100 rounded underline text-sm border border-gray-200" title="Underline">U</button>
-                  <button type="button" onMouseDown={(e) => { e.preventDefault(); applyFormat('removeFormat'); }}
-                    className="px-2 py-1 hover:bg-red-100 rounded text-sm text-red-600 border border-gray-200" title="Clear">✕</button>
+            <div className="relative w-full">
+              <div 
+                ref={editorRef} 
+                contentEditable 
+                onInput={handleInput}
+                onKeyDown={handleKeyDown}
+                data-cell={column}
+                className="w-full min-h-[2.5rem] bg-transparent focus:bg-gray-50 focus:ring-1 focus:ring-blue-300 rounded px-2 py-1 cursor-text text-sm"
+                style={{ wordWrap: 'break-word', whiteSpace: 'pre-wrap' }}
+                suppressContentEditableWarning
+                dangerouslySetInnerHTML={{ __html: localValue || '' }}
+              />
+              {!localValue && (
+                <div className="absolute top-1 left-2 text-gray-400 pointer-events-none select-none text-sm">
+                  {placeholder}
                 </div>
               )}
-              <div ref={editorRef} contentEditable onFocus={handleFocus} onBlur={handleBlur} onInput={handleInput}
-                className="w-full min-h-[3rem] bg-transparent focus:bg-gray-50 focus:ring-2 focus:ring-blue-300 rounded px-2 py-2 cursor-text"
-                style={{ wordWrap: 'break-word', whiteSpace: 'pre-wrap', minHeight: '48px' }}
-                suppressContentEditableWarning></div>
-              {!value && <div className="absolute top-2 left-2 text-gray-400 pointer-events-none select-none">{placeholder}</div>}
             </div>
           );
         }
@@ -84,14 +94,25 @@
         function CommentViewer() {
           const [expandedComments, setExpandedComments] = useState(new Set());
           const [collapsedColumns, setCollapsedColumns] = useState(new Set());
-          const [searchTerm, setSearchTerm] = useState('');
-          const [filterEditor, setFilterEditor] = useState('All');
           const [comments, setComments] = useState([]);
           const [officeReady, setOfficeReady] = useState(false);
           const [loading, setLoading] = useState(true);
           const [showCreateDialog, setShowCreateDialog] = useState(false);
           const [newCommentId, setNewCommentId] = useState('');
           const [newCommentLocation, setNewCommentLocation] = useState('');
+          const [columnWidths, setColumnWidths] = useState({
+            admin: 300,
+            proof: 300,
+            galley: 300
+          });
+
+          const applyFormat = (command) => {
+            document.execCommand(command, false, null);
+          };
+          
+          const applyHighlight = () => {
+            document.execCommand('hiliteColor', false, 'yellow');
+          };
 
           useEffect(() => {
             Office.onReady((info) => {
@@ -330,20 +351,8 @@
           const allEditors = ['All', 'Admin', 'Proof', 'Galley'];
 
           const filteredComments = useMemo(() => {
-            return comments.filter(comment => {
-              const matchesSearch = searchTerm === '' || 
-                comment.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                comment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                comment.items.some(item => 
-                  item.admin?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  item.proof?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  item.galley?.toLowerCase().includes(searchTerm.toLowerCase())
-                );
-              
-              const matchesEditor = filterEditor === 'All';
-              return matchesSearch && matchesEditor;
-            });
-          }, [searchTerm, filterEditor, comments]);
+            return comments; // Show all comments, no filtering
+          }, [comments]);
 
           const toggleExpand = (commentId) => {
             const newExpanded = new Set(expandedComments);
@@ -421,43 +430,33 @@
 
           return (
             <div className="h-screen flex flex-col bg-gray-50">
-              {/* Header */}
-              <div className="bg-blue-600 text-white p-4 shadow-lg">
-                <div className="flex flex-col gap-3 mb-3">
-                  <div className="flex items-center justify-between">
-                    <h1 className="text-xl font-bold">Law Review Comments v26</h1>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
+              {/* Header - Compact */}
+              <div className="bg-blue-600 text-white p-2 shadow-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <h1 className="text-lg font-bold">Law Review Comments v27</h1>
+                  <div className="flex gap-1">
+                    {/* Formatting Toolbar */}
+                    <div className="flex gap-1 border-r border-blue-500 pr-2 mr-1">
+                      <button onClick={() => applyFormat('bold')}
+                        className="px-2 py-1 hover:bg-blue-700 rounded font-bold text-sm" title="Bold (Cmd/Ctrl+B)">B</button>
+                      <button onClick={() => applyFormat('italic')}
+                        className="px-2 py-1 hover:bg-blue-700 rounded italic text-sm" title="Italic (Cmd/Ctrl+I)">I</button>
+                      <button onClick={applyHighlight}
+                        className="px-2 py-1 hover:bg-blue-700 rounded text-sm" title="Highlight" style={{backgroundColor: 'rgba(255,255,0,0.3)'}}>H</button>
+                      <button onClick={() => applyFormat('removeFormat')}
+                        className="px-2 py-1 hover:bg-blue-700 rounded text-sm text-red-300" title="Clear formatting">✕</button>
+                    </div>
+                    
                     <button onClick={createNewCommentFromSelection}
-                      className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition flex items-center gap-1"
-                      style={{ cursor: 'pointer' }}>
-                      <Plus /> New Comment
-                    </button>
+                      className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm transition"
+                      style={{ cursor: 'pointer' }}>+ New</button>
                     <button onClick={loadCommentsFromWord}
-                      className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm transition"
-                      style={{ cursor: 'pointer' }}>
-                      🔄 Refresh
-                    </button>
+                      className="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-sm transition"
+                      style={{ cursor: 'pointer' }}>🔄</button>
                     <button onClick={saveCommentsToWord}
-                      className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded text-sm transition"
-                      style={{ cursor: 'pointer' }}>
-                      Save to Word
-                    </button>
+                      className="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded text-sm transition"
+                      style={{ cursor: 'pointer' }}>Save</button>
                   </div>
-                </div>
-                
-                {/* Search and Filter */}
-                <div className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <div className="absolute left-3 top-2.5 text-blue-300"><SearchIcon /></div>
-                    <input type="text" placeholder="Search comments..." value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 rounded bg-blue-700 text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-                  </div>
-                  <select value={filterEditor} onChange={(e) => setFilterEditor(e.target.value)}
-                    className="px-3 py-2 rounded bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    {allEditors.map(editor => <option key={editor} value={editor}>{editor}</option>)}
-                  </select>
                 </div>
               </div>
 
@@ -492,8 +491,8 @@
                 </div>
               )}
 
-              {/* Comments List */}
-              <div className="flex-1 overflow-y-auto p-4">
+              {/* Comments List - Compact */}
+              <div className="flex-1 overflow-y-auto p-2">
                 {loading ? (
                   <div className="text-center text-gray-500 mt-8">Loading comments...</div>
                 ) : comments.length === 0 ? (
@@ -506,13 +505,13 @@
                   <div className="text-center text-gray-500 mt-8">No comments found.</div>
                 ) : (
                   filteredComments.map(comment => (
-                    <div key={comment.id} className="mb-4 bg-white rounded-lg shadow border border-gray-200">
-                      {/* Comment Header */}
-                      <div className="p-3 bg-gray-100 border-b border-gray-200 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-gray-200 p-2 rounded-l transition"
+                    <div key={comment.id} className="mb-2 bg-white rounded shadow border border-gray-200">
+                      {/* Comment Header - Compact */}
+                      <div className="p-2 bg-gray-100 border-b border-gray-200 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-200 p-1 rounded-l transition"
                           onClick={() => toggleExpand(comment.id)}>
                           {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
-                          <div>
+                          <div className="text-sm">
                             <span 
                               className="font-bold text-blue-600 cursor-pointer hover:underline"
                               onClick={(e) => {
@@ -522,16 +521,13 @@
                             >
                               {comment.id}
                             </span>
-                            <span className="mx-2 text-gray-400">|</span>
-                            <span className="text-gray-700">{comment.location}</span>
+                            <span className="mx-1 text-gray-400">|</span>
+                            <span className="text-gray-700 text-xs">{comment.location}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-sm text-gray-500 whitespace-nowrap">
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-gray-500">
                             {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
-                          </span>
-                          <span className="text-xs text-gray-500 italic">
-                            Delete in Word →
                           </span>
                         </div>
                       </div>
@@ -559,52 +555,55 @@
                                   )
                                 ))}
                                 {collapsedColumns.size > 0 && (
-                                  <th className="px-2 py-2 text-center text-xs font-semibold text-gray-500 border-r border-gray-300">
+                                  <th className="px-1 py-1 text-center text-xs font-semibold text-gray-500 border-r border-gray-300">
                                     <div className="flex flex-col gap-1">
                                       {Array.from(collapsedColumns).map(col => (
                                         <button key={col} onClick={(e) => { e.stopPropagation(); toggleColumn(col); }}
-                                          className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1 transition">
+                                          className="px-1 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1 transition">
                                           <ChevronDown /> {col.charAt(0).toUpperCase() + col.slice(1)}
                                         </button>
                                       ))}
                                     </div>
                                   </th>
                                 )}
-                                <th className="px-2 py-2 w-12"></th>
+                                <th className="px-1 py-1 w-8"></th>
                               </tr>
                             </thead>
                             <tbody>
                               {comment.items.map((item, idx) => (
                                 <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                  <td className="px-3 py-2 text-sm font-bold text-blue-700 border-r border-gray-200 align-top">
+                                  <td className="px-2 py-1 text-xs font-bold text-blue-700 border-r border-gray-200 align-top">
                                     <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
-                                      className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1"
+                                      className="w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 text-xs"
                                       placeholder="ID" />
                                   </td>
                                   {!collapsedColumns.has('admin') && (
-                                    <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-200 align-top">
-                                      <RichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} placeholder="—" />
+                                    <td className="px-2 py-1 text-gray-800 border-r border-gray-200 align-top">
+                                      <RichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} 
+                                        placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" />
                                     </td>
                                   )}
                                   {!collapsedColumns.has('proof') && (
-                                    <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-200 align-top">
-                                      <RichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} placeholder="—" />
+                                    <td className="px-2 py-1 text-gray-800 border-r border-gray-200 align-top">
+                                      <RichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} 
+                                        placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" />
                                     </td>
                                   )}
                                   {!collapsedColumns.has('galley') && (
-                                    <td className="px-3 py-2 text-sm text-gray-800 border-r border-gray-200 align-top">
-                                      <RichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} placeholder="—" />
+                                    <td className="px-2 py-1 text-gray-800 border-r border-gray-200 align-top">
+                                      <RichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} 
+                                        placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" />
                                     </td>
                                   )}
                                   {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
-                                  <td className="px-2 py-2 text-center align-top">
-                                    <div className="flex flex-col gap-1">
+                                  <td className="px-1 py-1 text-center align-top">
+                                    <div className="flex flex-col gap-0.5">
                                       <button type="button" onClick={() => addRowAfter(comment.id, idx)}
-                                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1 rounded transition" title="Add row below">
-                                        <Plus />
+                                        className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded transition text-xs" title="Add row below">
+                                        +
                                       </button>
                                       <button type="button" onClick={() => deleteRow(comment.id, idx)}
-                                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded transition text-xs font-bold" title="Delete row">
+                                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-0.5 rounded transition text-xs font-bold" title="Delete row">
                                         ×
                                       </button>
                                     </div>
@@ -620,11 +619,11 @@
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="bg-gray-100 border-t border-gray-300 px-4 py-2 text-sm text-gray-600">
-                {officeReady ? "✓ Connected to Word" : "⚠ Waiting for Word..."} • 
-                Showing {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''} • 
-                Click ID to jump • Cmd/Ctrl+B/I/U for formatting
+              {/* Footer - Compact */}
+              <div className="bg-gray-100 border-t border-gray-300 px-2 py-1 text-xs text-gray-600">
+                {officeReady ? "✓ Word" : "⚠ Loading..."} • 
+                {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''} • 
+                Tab=move down • Select text & format
               </div>
             </div>
           );
