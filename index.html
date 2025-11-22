@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title>Law Review Comment Viewer - v27 POLISHED</title>
+    <title>Law Review Comment Viewer - v28 FIXED TYPING</title>
     
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,53 +20,65 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 27 - Polished UI!");
+        console.log("Law Review Add-in Version 28 - Fixed typing system!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // Rich text cell component - FIXED apostrophe bug
+        // Rich text cell component - COMPLETELY REWRITTEN
         function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column }) {
           const editorRef = useRef(null);
-          const [localValue, setLocalValue] = useState(value);
+          const isUpdatingRef = useRef(false);
           
-          // Only update local value when prop changes from outside
+          // Initialize content only once
           useEffect(() => {
-            if (value !== localValue && document.activeElement !== editorRef.current) {
-              setLocalValue(value);
-              if (editorRef.current) {
+            if (editorRef.current && !editorRef.current.innerHTML) {
+              editorRef.current.innerHTML = value || '';
+            }
+          }, []);
+          
+          // Only update if value changes from outside AND we're not currently editing
+          useEffect(() => {
+            if (editorRef.current && !isUpdatingRef.current && document.activeElement !== editorRef.current) {
+              const currentHtml = editorRef.current.innerHTML;
+              if (currentHtml !== value && value !== undefined) {
                 editorRef.current.innerHTML = value || '';
               }
             }
           }, [value]);
           
-          const handleInput = () => {
-            if (editorRef.current) {
-              const newValue = editorRef.current.innerHTML;
-              setLocalValue(newValue);
-              onChange(newValue);
-            }
+          const handleInput = (e) => {
+            isUpdatingRef.current = true;
+            const newHtml = e.target.innerHTML;
+            onChange(newHtml);
+            setTimeout(() => {
+              isUpdatingRef.current = false;
+            }, 0);
           };
           
           const handleKeyDown = (e) => {
             // Tab key = move to cell below
             if (e.key === 'Tab') {
               e.preventDefault();
-              const nextCell = findNextCell(commentId, itemIndex, column);
-              if (nextCell) {
+              
+              // Find all editable cells in this column
+              const allCells = Array.from(document.querySelectorAll(`[data-cell-column="${column}"]`));
+              const currentIndex = allCells.indexOf(editorRef.current);
+              
+              if (currentIndex >= 0 && currentIndex < allCells.length - 1) {
+                const nextCell = allCells[currentIndex + 1];
                 nextCell.focus();
+                
+                // Place cursor at end
+                const range = document.createRange();
+                const sel = window.getSelection();
+                if (nextCell.childNodes.length > 0) {
+                  range.selectNodeContents(nextCell);
+                  range.collapse(false);
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                }
               }
             }
-          };
-          
-          const findNextCell = (cId, iIdx, col) => {
-            // Find the next cell below in the same column
-            const allCells = document.querySelectorAll(`[data-cell="${col}"]`);
-            let foundCurrent = false;
-            for (let cell of allCells) {
-              if (foundCurrent) return cell;
-              if (cell === editorRef.current) foundCurrent = true;
-            }
-            return null;
           };
           
           return (
@@ -76,13 +88,12 @@
                 contentEditable 
                 onInput={handleInput}
                 onKeyDown={handleKeyDown}
-                data-cell={column}
+                data-cell-column={column}
                 className="w-full min-h-[2.5rem] bg-transparent focus:bg-gray-50 focus:ring-1 focus:ring-blue-300 rounded px-2 py-1 cursor-text text-sm"
                 style={{ wordWrap: 'break-word', whiteSpace: 'pre-wrap' }}
                 suppressContentEditableWarning
-                dangerouslySetInnerHTML={{ __html: localValue || '' }}
               />
-              {!localValue && (
+              {!value && (
                 <div className="absolute top-1 left-2 text-gray-400 pointer-events-none select-none text-sm">
                   {placeholder}
                 </div>
@@ -433,7 +444,7 @@
               {/* Header - Compact */}
               <div className="bg-blue-600 text-white p-2 shadow-lg">
                 <div className="flex items-center justify-between gap-2">
-                  <h1 className="text-lg font-bold">Law Review Comments v27</h1>
+                  <h1 className="text-lg font-bold">LR Comments v28</h1>
                   <div className="flex gap-1">
                     {/* Formatting Toolbar */}
                     <div className="flex gap-1 border-r border-blue-500 pr-2 mr-1">
