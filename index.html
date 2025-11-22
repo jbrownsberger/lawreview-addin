@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title>Law Review Comment Viewer - v25 NATIVE COMMENTS</title>
+    <title>Law Review Comment Viewer - v26 AUTO-SYNC</title>
     
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,7 +20,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 25 - Using Native Word Comments!");
+        console.log("Law Review Add-in Version 26 - Auto-sync with Word comments!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -102,24 +102,50 @@
             });
           }, []);
 
-          // Load comments from document properties
+          // Load and sync: only show comments that have Word comments
           async function loadCommentsFromWord() {
             setLoading(true);
             setTimeout(async () => {
               try {
                 await Word.run(async (context) => {
+                  // Get all Word comments
+                  const wordComments = context.document.body.getComments();
+                  wordComments.load("items");
+                  await context.sync();
+                  
+                  const wordCommentIds = [];
+                  for (let i = 0; i < wordComments.items.length; i++) {
+                    const comment = wordComments.items[i];
+                    comment.load("content");
+                    await context.sync();
+                    wordCommentIds.push(comment.content);
+                  }
+                  
+                  // Load our stored data
                   const properties = context.document.properties;
                   const customProps = properties.customProperties;
-                  
                   const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
                   commentsProp.load("value");
                   await context.sync();
                   
                   if (!commentsProp.isNullObject) {
-                    const loadedComments = JSON.parse(commentsProp.value);
-                    setComments(loadedComments);
-                    if (loadedComments.length > 0) {
-                      setExpandedComments(new Set([loadedComments[0].id]));
+                    const storedComments = JSON.parse(commentsProp.value);
+                    
+                    // SYNC: Only keep comments that have Word comments
+                    const syncedComments = storedComments.filter(c => 
+                      wordCommentIds.includes(c.id)
+                    );
+                    
+                    setComments(syncedComments);
+                    
+                    // Auto-save the synced list (removes orphaned entries)
+                    if (syncedComments.length !== storedComments.length) {
+                      commentsProp.value = JSON.stringify(syncedComments);
+                      await context.sync();
+                    }
+                    
+                    if (syncedComments.length > 0) {
+                      setExpandedComments(new Set([syncedComments[0].id]));
                     }
                   } else {
                     setComments([]);
@@ -299,61 +325,7 @@
             }, 100);
           }
 
-          // Delete comment - removes Word comment + updates data
-          function deleteCommentById(commentId) {
-            const confirmDelete = confirm(
-              `Are you sure you want to delete comment ${commentId}?\n\nThis will remove the Word comment and all table data.`
-            );
-            
-            if (!confirmDelete) {
-              return;
-            }
-            
-            setTimeout(async () => {
-              try {
-                await Word.run(async (context) => {
-                  // Find and delete the Word comment
-                  const wordComments = context.document.body.getComments();
-                  wordComments.load("items");
-                  await context.sync();
-                  
-                  for (let i = 0; i < wordComments.items.length; i++) {
-                    const comment = wordComments.items[i];
-                    comment.load("content");
-                    await context.sync();
-                    
-                    if (comment.content === commentId) {
-                      comment.delete();
-                      await context.sync();
-                      break;
-                    }
-                  }
-                  
-                  // Remove from our data
-                  const updatedComments = comments.filter(c => c.id !== commentId);
-                  setComments(updatedComments);
-                  
-                  // Save updated data
-                  const properties = context.document.properties;
-                  const customProps = properties.customProperties;
-                  const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
-                  await context.sync();
-                  
-                  if (!commentsProp.isNullObject) {
-                    commentsProp.value = JSON.stringify(updatedComments);
-                  } else {
-                    customProps.add("lawReviewComments", JSON.stringify(updatedComments));
-                  }
-                  
-                  await context.sync();
-                  alert(`Comment ${commentId} deleted successfully!`);
-                });
-              } catch (error) {
-                console.error("Error deleting comment:", error);
-                alert("Error deleting comment: " + error.message);
-              }
-            }, 100);
-          }
+          // Removed deleteCommentById function - delete via Word instead!
 
           const allEditors = ['All', 'Admin', 'Proof', 'Galley'];
 
@@ -453,13 +425,18 @@
               <div className="bg-blue-600 text-white p-4 shadow-lg">
                 <div className="flex flex-col gap-3 mb-3">
                   <div className="flex items-center justify-between">
-                    <h1 className="text-xl font-bold">Law Review Comments v25</h1>
+                    <h1 className="text-xl font-bold">Law Review Comments v26</h1>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={createNewCommentFromSelection}
                       className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded text-sm transition flex items-center gap-1"
                       style={{ cursor: 'pointer' }}>
                       <Plus /> New Comment
+                    </button>
+                    <button onClick={loadCommentsFromWord}
+                      className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-sm transition"
+                      style={{ cursor: 'pointer' }}>
+                      🔄 Refresh
                     </button>
                     <button onClick={saveCommentsToWord}
                       className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded text-sm transition"
@@ -502,7 +479,7 @@
                       <input type="text" value={newCommentLocation} onChange={(e) => setNewCommentLocation(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                       <p className="mt-1 text-xs text-gray-500">
-                        A Word comment with this ID will appear in the margin.
+                        A Word comment with this ID will appear in the margin. To delete later, just delete the Word comment and click Refresh.
                       </p>
                     </div>
                     <div className="flex gap-2 justify-end">
@@ -523,6 +500,7 @@
                   <div className="text-center text-gray-500 mt-8">
                     <p className="text-lg mb-2">No comments yet!</p>
                     <p className="text-sm">Select some text and click "New Comment" to get started.</p>
+                    <p className="text-xs mt-2 text-gray-400">Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
                   </div>
                 ) : filteredComments.length === 0 ? (
                   <div className="text-center text-gray-500 mt-8">No comments found.</div>
@@ -552,9 +530,9 @@
                           <span className="text-sm text-gray-500 whitespace-nowrap">
                             {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
                           </span>
-                          <button onClick={(e) => { e.stopPropagation(); deleteCommentById(comment.id); }}
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-semibold transition"
-                            style={{ cursor: 'pointer' }}>Delete</button>
+                          <span className="text-xs text-gray-500 italic">
+                            Delete in Word →
+                          </span>
                         </div>
                       </div>
 
