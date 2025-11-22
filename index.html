@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title>Law Review Comment Viewer - v29 SMART SORTING</title>
+    <title>Law Review Comment Viewer - v30 SYNC BUTTON</title>
     
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,7 +20,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 29 - Sort by position + auto-jump!");
+        console.log("Law Review Add-in Version 30 - Sync Selection button!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -131,17 +131,13 @@
               if (info.host === Office.HostType.Word) {
                 setOfficeReady(true);
                 loadCommentsFromWord();
-                
-                // Set up event listener for comment selection
-                startWatchingSelection();
               }
             });
           }, []);
 
-          // Watch for comment selection in Word
-          function startWatchingSelection() {
-            // Poll every 500ms to check if a comment is selected
-            setInterval(async () => {
+          // Sync to selected comment - manual trigger
+          function syncToSelectedComment() {
+            setTimeout(async () => {
               try {
                 await Word.run(async (context) => {
                   const selection = context.document.getSelection();
@@ -149,30 +145,40 @@
                   comments.load("items");
                   await context.sync();
                   
-                  if (comments.items.length > 0) {
-                    const firstComment = comments.items[0];
-                    firstComment.load("content");
-                    await context.sync();
-                    
-                    const commentId = firstComment.content;
-                    
-                    // Jump to this comment in our viewer
-                    setSelectedCommentId(commentId);
-                    setExpandedComments(new Set([commentId]));
-                    
-                    // Scroll to it
-                    setTimeout(() => {
-                      const element = document.getElementById(`comment-${commentId}`);
-                      if (element) {
-                        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                      }
-                    }, 100);
+                  if (comments.items.length === 0) {
+                    alert("No comment selected. Click on a Word comment in the margin first!");
+                    return;
                   }
+                  
+                  const firstComment = comments.items[0];
+                  firstComment.load("content");
+                  await context.sync();
+                  
+                  const commentId = firstComment.content;
+                  
+                  // Check if we have this comment
+                  if (!filteredComments.find(c => c.id === commentId)) {
+                    alert(`Comment ${commentId} not found in viewer. Click Refresh to reload.`);
+                    return;
+                  }
+                  
+                  // Jump to this comment in our viewer
+                  setSelectedCommentId(commentId);
+                  setExpandedComments(new Set([commentId]));
+                  
+                  // Scroll to it
+                  setTimeout(() => {
+                    const element = document.getElementById(`comment-${commentId}`);
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }, 100);
                 });
               } catch (error) {
-                // Ignore errors (happens when not in a comment)
+                console.error("Error syncing to comment:", error);
+                alert("Error: " + error.message);
               }
-            }, 500);
+            }, 100);
           }
 
           // Load and sync: only show comments that have Word comments, SORTED BY POSITION
@@ -500,7 +506,7 @@
               {/* Header - Compact */}
               <div className="bg-blue-600 text-white p-2 shadow-lg">
                 <div className="flex items-center justify-between gap-2">
-                  <h1 className="text-lg font-bold">Law Review Comments v29</h1>
+                  <h1 className="text-lg font-bold">Law Review Comments v30</h1>
                   <div className="flex gap-1">
                     {/* Formatting Toolbar */}
                     <div className="flex gap-1 border-r border-blue-500 pr-2 mr-1">
@@ -517,6 +523,9 @@
                     <button onClick={createNewCommentFromSelection}
                       className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm transition"
                       style={{ cursor: 'pointer' }}>+ New</button>
+                    <button onClick={syncToSelectedComment}
+                      className="bg-orange-600 hover:bg-orange-700 px-3 py-1 rounded text-sm transition"
+                      style={{ cursor: 'pointer' }} title="Jump to selected comment">⬇</button>
                     <button onClick={loadCommentsFromWord}
                       className="bg-purple-600 hover:bg-purple-700 px-3 py-1 rounded text-sm transition"
                       style={{ cursor: 'pointer' }}>🔄</button>
@@ -696,7 +705,7 @@
               <div className="bg-gray-100 border-t border-gray-300 px-2 py-1 text-xs text-gray-600">
                 {officeReady ? "✓ Word" : "⚠ Loading..."} • 
                 {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''} • 
-                Tab=move down • Select text & format
+                Click ⬇ to jump to selected comment
               </div>
             </div>
           );
