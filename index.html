@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title>Law Review Comment Viewer - v28 FIXED TYPING</title>
+    <title>Law Review Comment Viewer - v29 SMART SORTING</title>
     
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,7 +20,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 28 - Fixed typing system!");
+        console.log("Law Review Add-in Version 29 - Sort by position + auto-jump!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -116,6 +116,7 @@
             proof: 300,
             galley: 300
           });
+          const [selectedCommentId, setSelectedCommentId] = useState(null);
 
           const applyFormat = (command) => {
             document.execCommand(command, false, null);
@@ -130,28 +131,78 @@
               if (info.host === Office.HostType.Word) {
                 setOfficeReady(true);
                 loadCommentsFromWord();
+                
+                // Set up event listener for comment selection
+                startWatchingSelection();
               }
             });
           }, []);
 
-          // Load and sync: only show comments that have Word comments
+          // Watch for comment selection in Word
+          function startWatchingSelection() {
+            // Poll every 500ms to check if a comment is selected
+            setInterval(async () => {
+              try {
+                await Word.run(async (context) => {
+                  const selection = context.document.getSelection();
+                  const comments = selection.getComments();
+                  comments.load("items");
+                  await context.sync();
+                  
+                  if (comments.items.length > 0) {
+                    const firstComment = comments.items[0];
+                    firstComment.load("content");
+                    await context.sync();
+                    
+                    const commentId = firstComment.content;
+                    
+                    // Jump to this comment in our viewer
+                    setSelectedCommentId(commentId);
+                    setExpandedComments(new Set([commentId]));
+                    
+                    // Scroll to it
+                    setTimeout(() => {
+                      const element = document.getElementById(`comment-${commentId}`);
+                      if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }
+                    }, 100);
+                  }
+                });
+              } catch (error) {
+                // Ignore errors (happens when not in a comment)
+              }
+            }, 500);
+          }
+
+          // Load and sync: only show comments that have Word comments, SORTED BY POSITION
           async function loadCommentsFromWord() {
             setLoading(true);
             setTimeout(async () => {
               try {
                 await Word.run(async (context) => {
-                  // Get all Word comments
+                  // Get all Word comments with their positions
                   const wordComments = context.document.body.getComments();
                   wordComments.load("items");
                   await context.sync();
                   
-                  const wordCommentIds = [];
+                  const commentData = [];
                   for (let i = 0; i < wordComments.items.length; i++) {
                     const comment = wordComments.items[i];
                     comment.load("content");
+                    const range = comment.getRange();
+                    range.load("start");
                     await context.sync();
-                    wordCommentIds.push(comment.content);
+                    
+                    commentData.push({
+                      id: comment.content,
+                      position: range.start
+                    });
                   }
+                  
+                  // Sort by position in document
+                  commentData.sort((a, b) => a.position - b.position);
+                  const sortedIds = commentData.map(c => c.id);
                   
                   // Load our stored data
                   const properties = context.document.properties;
@@ -163,14 +214,19 @@
                   if (!commentsProp.isNullObject) {
                     const storedComments = JSON.parse(commentsProp.value);
                     
-                    // SYNC: Only keep comments that have Word comments
+                    // Filter to only existing comments
                     const syncedComments = storedComments.filter(c => 
-                      wordCommentIds.includes(c.id)
+                      sortedIds.includes(c.id)
                     );
+                    
+                    // Sort by document position
+                    syncedComments.sort((a, b) => {
+                      return sortedIds.indexOf(a.id) - sortedIds.indexOf(b.id);
+                    });
                     
                     setComments(syncedComments);
                     
-                    // Auto-save the synced list (removes orphaned entries)
+                    // Auto-save the synced list
                     if (syncedComments.length !== storedComments.length) {
                       commentsProp.value = JSON.stringify(syncedComments);
                       await context.sync();
@@ -444,7 +500,7 @@
               {/* Header - Compact */}
               <div className="bg-blue-600 text-white p-2 shadow-lg">
                 <div className="flex items-center justify-between gap-2">
-                  <h1 className="text-lg font-bold">LR Comments v28</h1>
+                  <h1 className="text-lg font-bold">Law Review Comments v29</h1>
                   <div className="flex gap-1">
                     {/* Formatting Toolbar */}
                     <div className="flex gap-1 border-r border-blue-500 pr-2 mr-1">
@@ -516,7 +572,13 @@
                   <div className="text-center text-gray-500 mt-8">No comments found.</div>
                 ) : (
                   filteredComments.map(comment => (
-                    <div key={comment.id} className="mb-2 bg-white rounded shadow border border-gray-200">
+                    <div 
+                      key={comment.id} 
+                      id={`comment-${comment.id}`}
+                      className={`mb-2 bg-white rounded shadow border-2 transition-colors ${
+                        selectedCommentId === comment.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                      }`}
+                    >
                       {/* Comment Header - Compact */}
                       <div className="p-2 bg-gray-100 border-b border-gray-200 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-200 p-1 rounded-l transition"
