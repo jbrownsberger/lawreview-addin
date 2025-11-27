@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title>Law Review Comment Viewer - v32 FINAL</title>
+    <title>Law Review Comment Viewer - v33 KEYBOARD SHORTCUTS</title>
     
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -20,7 +20,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        console.log("Law Review Add-in Version 32 - Clean and efficient!");
+        console.log("Law Review Add-in Version 33 - Keyboard shortcuts fixed!");
         
         const { useState, useEffect, useMemo, useRef } = React;
 
@@ -56,6 +56,27 @@
           };
           
           const handleKeyDown = (e) => {
+            // Cmd/Ctrl + B = Bold
+            if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+              e.preventDefault();
+              document.execCommand('bold', false, null);
+              return;
+            }
+            
+            // Cmd/Ctrl + I = Italic
+            if ((e.metaKey || e.ctrlKey) && e.key === 'i') {
+              e.preventDefault();
+              document.execCommand('italic', false, null);
+              return;
+            }
+            
+            // Cmd/Ctrl + U = Underline (in case they want it)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'u') {
+              e.preventDefault();
+              document.execCommand('underline', false, null);
+              return;
+            }
+            
             // Tab key = move to cell below
             if (e.key === 'Tab') {
               e.preventDefault();
@@ -515,7 +536,7 @@
             <div className="h-screen flex flex-col bg-gray-50">
               {/* Header - Title on top, buttons below */}
               <div className="bg-blue-600 text-white p-2 shadow-lg">
-                <h1 className="text-base font-bold mb-1 text-center">Law Review Comments v32</h1>
+                <h1 className="text-base font-bold mb-1 text-center">Law Review Comments v33</h1>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex gap-1">
                     {/* Formatting Toolbar */}
@@ -588,9 +609,7 @@
                     <div 
                       key={comment.id} 
                       id={`comment-${comment.id}`}
-                      className={`mb-2 bg-white rounded shadow border-2 transition-colors ${
-                        selectedCommentId === comment.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                      }`}
+                      className="mb-2 bg-white rounded shadow border border-gray-200"
                     >
                       {/* Comment Header - Compact */}
                       <div className="p-2 bg-gray-100 border-b border-gray-200 flex items-center justify-between gap-2">
@@ -707,9 +726,9 @@
 
               {/* Footer - Compact */}
               <div className="bg-gray-100 border-t border-gray-300 px-2 py-1 text-xs text-gray-600">
-                {officeReady ? "✓" : "⚠"} • 
+                {officeReady ? "✓ Ready" : "⚠ Loading..."} • 
                 {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''} • 
-                Auto-saves every 2s
+                Cmd/Ctrl+B=Bold, Cmd/Ctrl+I=Italic • Auto-saves
               </div>
             </div>
           );
