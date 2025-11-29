@@ -181,7 +181,7 @@
 
           // Removed sync function - wasn't working reliably
 
-          // Load and sync: only show comments that have Word comments, SORTED BY POSITION
+          // Load comments FROM Word comment text (not document properties)
           async function loadCommentsFromWord() {
             setLoading(true);
             setTimeout(async () => {
@@ -200,49 +200,42 @@
                     range.load("start");
                     await context.sync();
                     
+                    // Parse comment content
+                    const content = comment.content;
+                    
+                    // Format: "125A|||{json data}" or just "125A" (for new comments)
+                    let commentId, tableData;
+                    if (content.includes('|||')) {
+                      const parts = content.split('|||');
+                      commentId = parts[0];
+                      try {
+                        tableData = JSON.parse(parts[1]);
+                      } catch (e) {
+                        console.error("Error parsing comment data:", e);
+                        tableData = { items: [{ id: "1", admin: "", proof: "", galley: "" }] };
+                      }
+                    } else {
+                      // Just ID, no data yet
+                      commentId = content;
+                      tableData = { items: [{ id: "1", admin: "", proof: "", galley: "" }] };
+                    }
+                    
                     commentData.push({
-                      id: comment.content,
-                      position: range.start
+                      id: commentId,
+                      position: range.start,
+                      location: `Position ${range.start}`,
+                      timestamp: new Date().toISOString().split('T')[0],
+                      items: tableData.items
                     });
                   }
                   
                   // Sort by position in document
                   commentData.sort((a, b) => a.position - b.position);
-                  const sortedIds = commentData.map(c => c.id);
                   
-                  // Load our stored data
-                  const properties = context.document.properties;
-                  const customProps = properties.customProperties;
-                  const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
-                  commentsProp.load("value");
-                  await context.sync();
+                  setComments(commentData);
                   
-                  if (!commentsProp.isNullObject) {
-                    const storedComments = JSON.parse(commentsProp.value);
-                    
-                    // Filter to only existing comments
-                    const syncedComments = storedComments.filter(c => 
-                      sortedIds.includes(c.id)
-                    );
-                    
-                    // Sort by document position
-                    syncedComments.sort((a, b) => {
-                      return sortedIds.indexOf(a.id) - sortedIds.indexOf(b.id);
-                    });
-                    
-                    setComments(syncedComments);
-                    
-                    // Auto-save the synced list
-                    if (syncedComments.length !== storedComments.length) {
-                      commentsProp.value = JSON.stringify(syncedComments);
-                      await context.sync();
-                    }
-                    
-                    if (syncedComments.length > 0) {
-                      setExpandedComments(new Set([syncedComments[0].id]));
-                    }
-                  } else {
-                    setComments([]);
+                  if (commentData.length > 0) {
+                    setExpandedComments(new Set([commentData[0].id]));
                   }
                 });
               } catch (error) {
@@ -254,25 +247,39 @@
             }, 100);
           }
 
-          // Save comments to document properties (silent, no alert)
+          // Save comments TO Word comment text (silent, no alert)
           function saveCommentsToWordSilent() {
             if (!officeReady) return;
             
             setTimeout(async () => {
               try {
                 await Word.run(async (context) => {
-                  const properties = context.document.properties;
-                  const customProps = properties.customProperties;
-                  
-                  const commentsProp = customProps.getItemOrNullObject("lawReviewComments");
+                  const wordComments = context.document.body.getComments();
+                  wordComments.load("items");
                   await context.sync();
                   
-                  const commentsJson = JSON.stringify(comments);
-                  
-                  if (commentsProp.isNullObject) {
-                    customProps.add("lawReviewComments", commentsJson);
-                  } else {
-                    commentsProp.value = commentsJson;
+                  // Update each Word comment with its data
+                  for (let i = 0; i < wordComments.items.length; i++) {
+                    const wordComment = wordComments.items[i];
+                    wordComment.load("content");
+                    await context.sync();
+                    
+                    // Find matching comment in our data
+                    const currentContent = wordComment.content;
+                    const commentId = currentContent.includes('|||') ? 
+                      currentContent.split('|||')[0] : currentContent;
+                    
+                    const ourComment = comments.find(c => c.id === commentId);
+                    
+                    if (ourComment) {
+                      // Encode as: ID|||{json}
+                      const newContent = `${ourComment.id}|||${JSON.stringify({ items: ourComment.items })}`;
+                      
+                      // Only update if changed (to avoid unnecessary operations)
+                      if (wordComment.content !== newContent) {
+                        wordComment.content = newContent;
+                      }
+                    }
                   }
                   
                   await context.sync();
@@ -728,7 +735,7 @@
               <div className="bg-gray-100 border-t border-gray-300 px-2 py-1 text-xs text-gray-600">
                 {officeReady ? "✓ Ready" : "⚠ Loading..."} • 
                 {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''} • 
-                Cmd/Ctrl+B=Bold, Cmd/Ctrl+I=Italic • Auto-saves
+                Data stored in Word comments • Copy/paste works!
               </div>
             </div>
           );
