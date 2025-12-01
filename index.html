@@ -139,6 +139,8 @@ function CommentViewer() {
   const [lastSaveTime, setLastSaveTime] = useState(Date.now());
   const saveTimeoutRef = useRef(null);
   const commentIdInputRef = useRef(null);
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   const applyFormat = (command) => {
     document.execCommand(command, false, null);
