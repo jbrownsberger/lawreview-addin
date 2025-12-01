@@ -150,6 +150,21 @@ function CommentViewer() {
     document.execCommand('hiliteColor', false, 'yellow');
   };
 
+  const saveToHistory = (newComments) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(JSON.parse(JSON.stringify(newComments)));
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      const previousState = history[historyIndex - 1];
+      setComments(JSON.parse(JSON.stringify(previousState)));
+      setHistoryIndex(historyIndex - 1);
+    }
+  };
+
   useEffect(() => {
     Office.onReady((info) => {
       if (info.host === Office.HostType.Word) {
@@ -414,25 +429,29 @@ function CommentViewer() {
   };
 
   const addRowAfter = (commentId, afterIndex) => {
-    setComments(comments.map(comment => {
+    const newComments = comments.map(comment => {
       if (comment.id === commentId) {
         const newItems = [...comment.items];
         newItems.splice(afterIndex + 1, 0, { id: "", admin: "", proof: "", galley: "", isHeading: false });
         return { ...comment, items: newItems };
       }
       return comment;
-    }));
+    });
+    saveToHistory(newComments);
+    setComments(newComments);
   };
 
   const toggleHeading = (commentId, itemIndex) => {
-    setComments(comments.map(comment => {
+    const newComments = comments.map(comment => {
       if (comment.id === commentId) {
         const newItems = [...comment.items];
         newItems[itemIndex] = { ...newItems[itemIndex], isHeading: !newItems[itemIndex].isHeading };
         return { ...comment, items: newItems };
       }
       return comment;
-    }));
+    });
+    saveToHistory(newComments);
+    setComments(newComments);
   };
 
   const updateCell = (commentId, itemIndex, column, value) => {
@@ -447,13 +466,15 @@ function CommentViewer() {
   };
 
   const deleteRow = (commentId, itemIndex) => {
-    setComments(comments.map(comment => {
+    const newComments = comments.map(comment => {
       if (comment.id === commentId) {
         const newItems = comment.items.filter((_, idx) => idx !== itemIndex);
         return { ...comment, items: newItems };
       }
       return comment;
-    }));
+    });
+    saveToHistory(newComments);
+    setComments(newComments);
   };
 
   const handleDialogKeyDown = (e) => {
@@ -482,16 +503,21 @@ function CommentViewer() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      <div className="bg-white border-b border-gray-300 px-3 py-2">
+      <div className="bg-gray-100 border-b border-gray-300 px-3 py-2">
         <div className="flex items-center justify-between gap-2 mb-2">
           <h1 className="text-sm font-semibold text-gray-700">Law Review Comments</h1>
           <div className="flex gap-1">
             <button onClick={createNewCommentFromSelection}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-2 py-1 rounded text-xs font-medium"
+              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium"
               style={{ cursor: 'pointer' }}>+ New</button>
             <button onClick={loadCommentsFromWord}
-              className="bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs font-medium"
+              className="bg-indigo-500 hover:bg-indigo-600 text-white px-2 py-1 rounded text-xs font-medium"
               style={{ cursor: 'pointer' }}>↻ Refresh</button>
+            <button onClick={undo}
+              disabled={historyIndex <= 0}
+              className={`${historyIndex <= 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-1 rounded text-xs font-medium`}
+              style={{ cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer' }}
+              title="Undo">⎌ Undo</button>
           </div>
         </div>
         <div className="flex gap-1">
@@ -549,7 +575,7 @@ function CommentViewer() {
               </button>
               <button 
                 onClick={finalizeCreateComment}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium">
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm font-medium">
                 Create Comment
               </button>
             </div>
