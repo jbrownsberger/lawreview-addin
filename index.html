@@ -114,7 +114,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
-        className="w-full min-h-[2rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm"
+        className="w-full min-h-[1.5rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-0.5 cursor-text text-sm"
         style={{ wordWrap: 'break-word', whiteSpace: 'pre-wrap' }}
         suppressContentEditableWarning
       />
@@ -375,17 +375,20 @@ function CommentViewer() {
     setTimeout(async () => {
       try {
         await Word.run(async (context) => {
-          const comments = context.document.body.getComments();
-          comments.load("items");
+          const wordComments = context.document.body.getComments();
+          wordComments.load("items");
           await context.sync();
 
           let found = false;
-          for (let i = 0; i < comments.items.length; i++) {
-            const comment = comments.items[i];
+          for (let i = 0; i < wordComments.items.length; i++) {
+            const comment = wordComments.items[i];
             comment.load("content");
             await context.sync();
 
-            if (comment.content === commentId) {
+            const content = comment.content;
+            const actualCommentId = content.includes('|||') ? content.split('|||')[0] : content;
+
+            if (actualCommentId === commentId) {
               const range = comment.getRange();
               range.select();
               found = true;
@@ -669,13 +672,13 @@ function CommentViewer() {
                     <tbody>
                       {comment.items.map((item, idx) => (
                         <tr key={idx} className={item.isHeading ? 'bg-blue-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')}>
-                          <td className="px-2 py-1 font-semibold text-gray-700 border-r border-gray-200 align-top">
+                          <td className="px-2 py-0.5 font-semibold text-gray-700 border-r border-gray-200 align-top">
                             <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
                               className={`w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 text-xs ${item.isHeading ? 'font-bold' : ''}`}
                               placeholder="ID" />
                           </td>
                           {!collapsedColumns.has('admin') && (
-                            <td className="px-2 py-1 text-gray-800 border-r border-gray-200 align-top">
+                            <td className="px-2 py-0.5 text-gray-800 border-r border-gray-200 align-top">
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" />
@@ -683,7 +686,7 @@ function CommentViewer() {
                             </td>
                           )}
                           {!collapsedColumns.has('proof') && (
-                            <td className="px-2 py-1 text-gray-800 border-r border-gray-200 align-top">
+                            <td className="px-2 py-0.5 text-gray-800 border-r border-gray-200 align-top">
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" />
@@ -691,7 +694,7 @@ function CommentViewer() {
                             </td>
                           )}
                           {!collapsedColumns.has('galley') && (
-                            <td className="px-2 py-1 text-gray-800 border-r border-gray-200 align-top">
+                            <td className="px-2 py-0.5 text-gray-800 border-r border-gray-200 align-top">
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" />
@@ -699,7 +702,7 @@ function CommentViewer() {
                             </td>
                           )}
                           {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
-                          <td className="px-1 py-1 text-center align-top">
+                          <td className="px-1 py-0.5 text-center align-top">
                             <div className="flex flex-col gap-0.5">
                               <button type="button" onClick={() => toggleHeading(comment.id, idx)}
                                 className={`${item.isHeading ? 'text-blue-600' : 'text-gray-500'} hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-xs font-bold`} 
