@@ -80,25 +80,14 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
     
     const showNbsp = document.querySelector('.show-nbsp') !== null;
     
-    if (showNbsp) {
-      // Replace nbsp with visible marker
-      const html = editorRef.current.innerHTML;
-      const modified = html.replace(/\u00A0/g, '<span style="color: #93c5fd;">°</span>');
-      if (modified !== html) {
-        const selection = window.getSelection();
-        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-        editorRef.current.innerHTML = modified;
-        if (range) {
-          try {
-            selection.removeAllRanges();
-            selection.addRange(range);
-          } catch (e) {
-            // Ignore selection errors
-          }
-        }
+    if (showNbsp && value) {
+      // Display nonbreaking spaces as pale blue degree symbols
+      const displayHtml = value.replace(/\u00A0/g, '<span style="color: #93c5fd; font-weight: bold;">°</span>');
+      if (editorRef.current.innerHTML !== displayHtml) {
+        editorRef.current.innerHTML = displayHtml;
       }
     }
-  });
+  }, [value, showNonBreakingSpaces]);
 
   const handleInput = (e) => {
     isUpdatingRef.current = true;
@@ -128,9 +117,13 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         
         if (node.nodeType === Node.ELEMENT_NODE) {
           const tagName = node.tagName.toLowerCase();
-          const style = node.style.fontVariant;
-          const isItalic = tagName === 'i' || tagName === 'em' || node.style.fontStyle === 'italic';
-          const isSmallCaps = style === 'small-caps';
+          const computedStyle = window.getComputedStyle ? null : node.style;
+          const style = node.style;
+          const isItalic = tagName === 'i' || tagName === 'em' || 
+                          style.fontStyle === 'italic' || 
+                          node.getAttribute('style')?.includes('font-style: italic');
+          const isSmallCaps = style.fontVariant === 'small-caps' || 
+                             node.getAttribute('style')?.includes('font-variant: small-caps');
           
           // Recursively process children
           const children = Array.from(node.childNodes).map(processNode);
@@ -187,6 +180,28 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
     }
   };
 
+  const handleCopy = (e) => {
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const container = document.createElement('div');
+      container.appendChild(range.cloneContents());
+      
+      // Remove background colors
+      const elementsWithBg = container.querySelectorAll('[style*="background"]');
+      elementsWithBg.forEach(el => {
+        el.style.backgroundColor = '';
+        el.style.background = '';
+      });
+      
+      // Set plain text
+      e.clipboardData.setData('text/plain', container.textContent);
+      // Set HTML without backgrounds
+      e.clipboardData.setData('text/html', container.innerHTML);
+      e.preventDefault();
+    }
+  };
+
   const handleKeyDown = (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
       e.preventDefault();
@@ -229,6 +244,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         contentEditable
         onInput={handleInput}
         onPaste={handlePaste}
+        onCopy={handleCopy}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
         className="w-full min-h-[1.8rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm leading-tight"
@@ -956,7 +972,7 @@ function CommentViewer() {
                           <td className="px-1.5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top">
                             <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
                               className={`w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs ${item.isHeading ? 'font-bold' : ''}`}
-                              placeholder="ID" />
+                              placeholder="#" />
                           </td>
                           {!collapsedColumns.has('admin') && (
                             <td className="px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top">
