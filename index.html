@@ -114,7 +114,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
-        className="w-full min-h-[1.5rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-0.5 cursor-text text-sm"
+        className="w-full min-h-[1.5rem] bg-transparent focus:bg-stone-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-0.5 cursor-text text-sm"
         style={{ wordWrap: 'break-word', whiteSpace: 'pre-wrap' }}
         suppressContentEditableWarning
       />
@@ -505,36 +505,36 @@ function CommentViewer() {
   );
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <div className="bg-gray-100 border-b border-gray-300 px-3 py-2">
+    <div className="h-screen flex flex-col bg-stone-50">
+      <div className="bg-stone-100 border-b border-gray-300 px-3 py-2">
         <div className="flex items-center justify-between gap-2 mb-2">
           <h1 className="text-sm font-semibold text-gray-700">Law Review Comments</h1>
           <div className="flex gap-1">
             <button onClick={createNewCommentFromSelection}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium"
+              className="bg-cyan-500 hover:bg-cyan-600 text-white px-2 py-1 rounded text-xs font-medium"
               style={{ cursor: 'pointer' }}>+ New</button>
             <button onClick={loadCommentsFromWord}
-              className="bg-indigo-500 hover:bg-indigo-600 text-white px-2 py-1 rounded text-xs font-medium"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium"
               style={{ cursor: 'pointer' }}>↻ Refresh</button>
             <button onClick={undo}
               disabled={historyIndex <= 0}
-              className={`${historyIndex <= 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-1 rounded text-xs font-medium`}
+              className={`${historyIndex <= 0 ? 'bg-stone-300 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-1 rounded text-xs font-medium`}
               style={{ cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer' }}
               title="Undo">⎌ Undo</button>
           </div>
         </div>
         <div className="flex gap-1">
           <button onClick={() => applyFormat('bold')}
-            className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded font-bold text-xs"
+            className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 border border-gray-300 rounded font-bold text-xs"
             title="Bold">B</button>
           <button onClick={() => applyFormat('italic')}
-            className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded italic text-xs"
+            className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 border border-gray-300 rounded italic text-xs"
             title="Italic">I</button>
           <button onClick={applyHighlight}
             className="px-2 py-0.5 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded text-xs"
             title="Highlight">H</button>
           <button onClick={() => applyFormat('removeFormat')}
-            className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-xs text-red-600"
+            className="px-2 py-0.5 bg-stone-100 hover:bg-stone-200 border border-gray-300 rounded text-xs text-red-600"
             title="Clear">✕</button>
         </div>
       </div>
@@ -566,19 +566,19 @@ function CommentViewer() {
                 onKeyDown={handleDialogKeyDown}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent" 
               />
-              <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+              <p className="mt-2 text-xs text-gray-500 bg-stone-50 p-2 rounded">
                 💡 A Word comment will appear in the margin. To delete later, just delete the Word comment and click Refresh.
               </p>
             </div>
             <div className="flex gap-2 justify-end">
               <button 
                 onClick={() => { setShowCreateDialog(false); setNewCommentId(''); setNewCommentLocation(''); }}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm">
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-stone-50 text-sm">
                 Cancel
               </button>
               <button 
                 onClick={finalizeCreateComment}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm font-medium">
+                className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-600 text-sm font-medium">
                 Create Comment
               </button>
             </div>
@@ -607,8 +607,8 @@ function CommentViewer() {
               id={`comment-${comment.id}`}
               className="mb-2 bg-white rounded border border-gray-200 shadow-sm"
             >
-              <div className="px-2 py-1.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded"
+              <div className="px-2 py-1.5 bg-stone-50 border-b border-gray-200 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-stone-100 px-1 py-0.5 rounded"
                   onClick={() => toggleExpand(comment.id)}>
                   {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
                   <div className="text-xs">
@@ -635,7 +635,7 @@ function CommentViewer() {
               {expandedComments.has(comment.id) && (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-xs">
-                    <thead className="bg-gray-100 border-b border-gray-300">
+                    <thead className="bg-stone-100 border-b border-gray-300">
                       <tr>
                         <th className="px-2 py-1.5 text-left font-semibold text-gray-700 border-r border-gray-200 w-20">Item #</th>
                         {[
@@ -645,7 +645,7 @@ function CommentViewer() {
                         ].map(({ key, label }) => (
                           !collapsedColumns.has(key) && (
                             <th key={key}
-                              className="px-2 py-1.5 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-200"
+                              className="px-2 py-1.5 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-stone-200"
                               style={{ minWidth: '250px' }} 
                               onClick={(e) => { e.stopPropagation(); toggleColumn(key); }}>
                               <div className="flex items-center justify-between">
@@ -659,7 +659,7 @@ function CommentViewer() {
                             <div className="flex flex-col gap-0.5">
                               {Array.from(collapsedColumns).map(col => (
                                 <button key={col} onClick={(e) => { e.stopPropagation(); toggleColumn(col); }}
-                                  className="px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1">
+                                  className="px-1.5 py-0.5 bg-stone-200 hover:bg-stone-300 rounded text-xs flex items-center gap-1">
                                   <ChevronDown /> {col.charAt(0).toUpperCase() + col.slice(1)}
                                 </button>
                               ))}
@@ -671,7 +671,7 @@ function CommentViewer() {
                     </thead>
                     <tbody>
                       {comment.items.map((item, idx) => (
-                        <tr key={idx} className={item.isHeading ? 'bg-blue-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')}>
+                        <tr key={idx} className={item.isHeading ? 'bg-cyan-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-stone-50')}>
                           <td className="px-2 py-0.5 font-semibold text-gray-700 border-r border-gray-200 align-top">
                             <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
                               className={`w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 text-xs ${item.isHeading ? 'font-bold' : ''}`}
@@ -705,12 +705,12 @@ function CommentViewer() {
                           <td className="px-1 py-0.5 text-center align-top">
                             <div className="flex flex-col gap-0.5">
                               <button type="button" onClick={() => toggleHeading(comment.id, idx)}
-                                className={`${item.isHeading ? 'text-blue-600' : 'text-gray-500'} hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-xs font-bold`} 
+                                className={`${item.isHeading ? 'text-blue-600' : 'text-gray-500'} hover:text-blue-800 hover:bg-cyan-50 p-0.5 rounded text-xs font-bold`} 
                                 title={item.isHeading ? "Convert to regular row" : "Convert to heading"}>
                                 H
                               </button>
                               <button type="button" onClick={() => addRowAfter(comment.id, idx)}
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-xs" title="Add row below">
+                                className="text-blue-600 hover:text-blue-800 hover:bg-cyan-50 p-0.5 rounded text-xs" title="Add row below">
                                 +
                               </button>
                               <button type="button" onClick={() => deleteRow(comment.id, idx)}
