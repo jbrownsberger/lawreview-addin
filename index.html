@@ -114,7 +114,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
-        className="w-full min-h-[2rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded : px-2 py-0.5 cursor-text text-sm"
+        className="w-full min-h-[1.8rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm leading-tight"
         style={{ wordWrap: 'break-word', whiteSpace: 'pre-wrap' }}
         suppressContentEditableWarning
       />
@@ -141,6 +141,10 @@ function CommentViewer() {
   const commentIdInputRef = useRef(null);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [currentUsername, setCurrentUsername] = useState(null);
+  const [showUsernameDialog, setShowUsernameDialog] = useState(false);
+  const [tempUsername, setTempUsername] = useState('');
+  const pendingEditRef = useRef(null);
 
   const applyFormat = (command) => {
     document.execCommand(command, false, null);
@@ -148,6 +152,27 @@ function CommentViewer() {
 
   const applyHighlight = () => {
     document.execCommand('hiliteColor', false, 'yellow');
+  };
+
+  const applyRed = () => {
+    document.execCommand('foreColor', false, 'red');
+  };
+
+  const applySmallCaps = () => {
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontVariant = 'small-caps';
+      try {
+        range.surroundContents(span);
+      } catch (e) {
+        // If surroundContents fails, try a different approach
+        const content = range.extractContents();
+        span.appendChild(content);
+        range.insertNode(span);
+      }
+    }
   };
 
   const saveToHistory = (newComments) => {
@@ -458,14 +483,55 @@ function CommentViewer() {
   };
 
   const updateCell = (commentId, itemIndex, column, value) => {
-    setComments(comments.map(comment => {
+    // If no username set and this is a content column (not 'id'), prompt for username
+    if (!currentUsername && column !== 'id' && value && value.trim()) {
+      pendingEditRef.current = { commentId, itemIndex, column, value };
+      setShowUsernameDialog(true);
+      return;
+    }
+
+    const newComments = comments.map(comment => {
       if (comment.id === commentId) {
         const newItems = [...comment.items];
-        newItems[itemIndex] = { ...newItems[itemIndex], [column]: value };
+        const updatedItem = { ...newItems[itemIndex], [column]: value };
+        
+        // Track who edited this column (only for content columns, not 'id' or 'isHeading')
+        if (currentUsername && column !== 'id' && !column.startsWith('_')) {
+          const editorKey = `_${column}Editor`;
+          updatedItem[editorKey] = currentUsername;
+        }
+        
+        newItems[itemIndex] = updatedItem;
         return { ...comment, items: newItems };
       }
       return comment;
-    }));
+    });
+    setComments(newComments);
+  };
+
+  const confirmUsername = () => {
+    if (tempUsername.trim()) {
+      setCurrentUsername(tempUsername.trim());
+      setShowUsernameDialog(false);
+      
+      // Apply the pending edit
+      if (pendingEditRef.current) {
+        const { commentId, itemIndex, column, value } = pendingEditRef.current;
+        const newComments = comments.map(comment => {
+          if (comment.id === commentId) {
+            const newItems = [...comment.items];
+            const updatedItem = { ...newItems[itemIndex], [column]: value };
+            const editorKey = `_${column}Editor`;
+            updatedItem[editorKey] = tempUsername.trim();
+            newItems[itemIndex] = updatedItem;
+            return { ...comment, items: newItems };
+          }
+          return comment;
+        });
+        setComments(newComments);
+        pendingEditRef.current = null;
+      }
+    }
   };
 
   const deleteRow = (commentId, itemIndex) => {
@@ -511,30 +577,36 @@ function CommentViewer() {
           <h1 className="text-sm font-semibold text-white">Law Review Comments</h1>
           <div className="flex gap-1">
             <button onClick={createNewCommentFromSelection}
-              className="bg-green-600 hover:bg-green-700 text-white px-2 py-0.5 rounded text-sm font-medium"
+              className="bg-green-600 hover:bg-green-700 text-white px-2 py-0.5 rounded text-xs font-medium"
               style={{ cursor: 'pointer' }}>+ New</button>
             <button onClick={loadCommentsFromWord}
-              className="bg-sky-500 hover:bg-sky-600 text-white px-2 py-0.5 rounded text-sm font-medium"
+              className="bg-sky-500 hover:bg-sky-600 text-white px-2 py-0.5 rounded text-xs font-medium"
               style={{ cursor: 'pointer' }}>↻ Refresh</button>
             <button onClick={undo}
               disabled={historyIndex <= 0}
-              className={`${historyIndex <= 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-0.5 rounded text-sm font-medium`}
+              className={`${historyIndex <= 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-0.5 rounded text-xs font-medium`}
               style={{ cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer' }}
               title="Undo">⎌ Undo</button>
           </div>
         </div>
         <div className="flex gap-1">
           <button onClick={() => applyFormat('bold')}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded font-bold text-white text-sm"
+            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded font-bold text-white text-xs"
             title="Bold">B</button>
           <button onClick={() => applyFormat('italic')}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded italic text-white text-sm"
+            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded italic text-white text-xs"
             title="Italic">I</button>
           <button onClick={applyHighlight}
-            className="px-2 py-0.5 bg-yellow-400 hover:bg-yellow-500 border border-yellow-500 rounded text-gray-900 text-sm font-medium"
+            className="px-2 py-0.5 bg-yellow-400 hover:bg-yellow-500 border border-yellow-500 rounded text-gray-900 text-xs font-medium"
             title="Highlight">H</button>
+          <button onClick={applyRed}
+            className="px-2 py-0.5 bg-red-500 hover:bg-red-600 border border-red-600 rounded text-white text-xs font-medium"
+            title="Red Text">R</button>
+          <button onClick={applySmallCaps}
+            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-white text-xs"
+            title="Small Caps">SC</button>
           <button onClick={() => applyFormat('removeFormat')}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-red-400 text-sm"
+            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-red-400 text-xs"
             title="Clear">✕</button>
         </div>
       </div>
@@ -566,7 +638,7 @@ function CommentViewer() {
                 onKeyDown={handleDialogKeyDown}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent" 
               />
-              <p className="mt-2 text-sm text-gray-500 bg-gray-50 p-2 rounded">
+              <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
                 💡 A Word comment will appear in the margin. To delete later, just delete the Word comment and click Refresh.
               </p>
             </div>
@@ -595,8 +667,8 @@ function CommentViewer() {
         ) : comments.length === 0 ? (
           <div className="text-center text-gray-500 mt-8 bg-white p-6 rounded border border-gray-200 max-w-sm mx-auto">
             <p className="text-base mb-2">📋 No comments yet</p>
-            <p className="text-sm mb-1">Select some text and click "New Comment" to get started.</p>
-            <p className="text-sm mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
+            <p className="text-xs mb-1">Select some text and click "New Comment" to get started.</p>
+            <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
           </div>
         ) : filteredComments.length === 0 ? (
           <div className="text-center text-gray-500 mt-8">No comments found.</div>
@@ -611,7 +683,7 @@ function CommentViewer() {
                 <div className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded"
                   onClick={() => toggleExpand(comment.id)}>
                   {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
-                  <div className="text-sm">
+                  <div className="text-xs">
                     <span
                       className="font-semibold text-gray-700 cursor-pointer hover:underline"
                       onClick={(e) => {
@@ -626,7 +698,7 @@ function CommentViewer() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-sm text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
+                  <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
                     {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -634,7 +706,7 @@ function CommentViewer() {
 
               {expandedComments.has(comment.id) && (
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
+                  <table className="w-full border-collapse text-xs">
                     <thead className="bg-gray-100 border-b border-gray-300">
                       <tr>
                         <th className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-200 w-20">Item #</th>
@@ -659,7 +731,7 @@ function CommentViewer() {
                             <div className="flex flex-col gap-0.5">
                               {Array.from(collapsedColumns).map(col => (
                                 <button key={col} onClick={(e) => { e.stopPropagation(); toggleColumn(col); }}
-                                  className=": px-2 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-sm flex items-center gap-1">
+                                  className="px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1">
                                   <ChevronDown /> {col.charAt(0).toUpperCase() + col.slice(1)}
                                 </button>
                               ))}
@@ -672,13 +744,13 @@ function CommentViewer() {
                     <tbody>
                       {comment.items.map((item, idx) => (
                         <tr key={idx} className={item.isHeading ? 'bg-blue-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')}>
-                          <td className=": px-2 py-0.5 font-semibold text-gray-700 border-r border-gray-200 align-top">
+                          <td className="px-1.5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top">
                             <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
-                              className={`w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-0 text-sm ${item.isHeading ? 'font-bold' : ''}`}
+                              className={`w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs ${item.isHeading ? 'font-bold' : ''}`}
                               placeholder="ID" />
                           </td>
                           {!collapsedColumns.has('admin') && (
-                            <td className=": px-2 py-0.5 text-gray-800 border-r border-gray-200 align-top">
+                            <td className="px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top">
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" />
@@ -686,7 +758,7 @@ function CommentViewer() {
                             </td>
                           )}
                           {!collapsedColumns.has('proof') && (
-                            <td className=": px-2 py-0.5 text-gray-800 border-r border-gray-200 align-top">
+                            <td className="px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top">
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" />
@@ -694,7 +766,7 @@ function CommentViewer() {
                             </td>
                           )}
                           {!collapsedColumns.has('galley') && (
-                            <td className=": px-2 py-0.5 text-gray-800 border-r border-gray-200 align-top">
+                            <td className="px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top">
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" />
@@ -702,19 +774,19 @@ function CommentViewer() {
                             </td>
                           )}
                           {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
-                          <td className="px-0.5 py-0.5 text-center align-top">
-                            <div className="flex flex-col gap-0.5">
+                          <td className="px-0.5 py-0 text-center align-top">
+                            <div className="flex flex-col gap-0.5 py-1">
                               <button type="button" onClick={() => toggleHeading(comment.id, idx)}
-                                className={`${item.isHeading ? 'text-blue-600' : 'text-gray-500'} hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-sm font-bold`} 
+                                className={`${item.isHeading ? 'text-blue-600' : 'text-gray-500'} hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-xs font-bold`} 
                                 title={item.isHeading ? "Convert to regular row" : "Convert to heading"}>
                                 H
                               </button>
                               <button type="button" onClick={() => addRowAfter(comment.id, idx)}
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-sm" title="Add row below">
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-xs" title="Add row below">
                                 +
                               </button>
                               <button type="button" onClick={() => deleteRow(comment.id, idx)}
-                                className="text-red-600 hover:text-red-800 hover:bg-red-50 p-0.5 rounded text-sm font-bold" title="Delete row">
+                                className="text-red-600 hover:text-red-800 hover:bg-red-50 p-0.5 rounded text-xs font-bold" title="Delete row">
                                 ×
                               </button>
                             </div>
@@ -730,7 +802,7 @@ function CommentViewer() {
         )}
       </div>
 
-      <div className="bg-white border-t border-gray-300 px-2 py-1 text-sm text-gray-600">
+      <div className="bg-white border-t border-gray-300 px-2 py-1 text-xs text-gray-600">
         {officeReady ? "✓ Ready" : "⚠ Loading..."} • 
         {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''} • 
         Data stored in Word comments
