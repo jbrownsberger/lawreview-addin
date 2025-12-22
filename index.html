@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v36</title>
+<title>Law Review Comment Viewer - v37</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -19,18 +19,6 @@ body {
 }
 [contenteditable] { outline: none; }
 [contenteditable]:focus { background-color: #f0f0f0; }
-
-/* Show nonbreaking spaces as pale blue degree symbols when enabled */
-.show-nbsp [contenteditable] {
-  white-space: pre-wrap;
-}
-.show-nbsp [contenteditable]::before {
-  content: '';
-}
-/* This will style nbsp entities */
-.show-nbsp [contenteditable] {
-  word-spacing: normal;
-}
 
 ::-webkit-scrollbar {
   width: 8px;
@@ -51,7 +39,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 36 - Clean design + Enter to submit!");
+console.log("Law Review Add-in Version 37 - Stable version!");
 
 const { useState, useEffect, useMemo, useRef } = React;
 
@@ -74,32 +62,6 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
     }
   }, [value]);
 
-  // Add effect to handle nonbreaking space display
-  useEffect(() => {
-    if (!editorRef.current) return;
-    
-    const showNbsp = document.querySelector('.show-nbsp') !== null;
-    
-    if (showNbsp) {
-      // Replace nbsp with visible marker
-      const html = editorRef.current.innerHTML;
-      const modified = html.replace(/\u00A0/g, '<span style="color: #93c5fd;">°</span>');
-      if (modified !== html) {
-        const selection = window.getSelection();
-        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-        editorRef.current.innerHTML = modified;
-        if (range) {
-          try {
-            selection.removeAllRanges();
-            selection.addRange(range);
-          } catch (e) {
-            // Ignore selection errors
-          }
-        }
-      }
-    }
-  });
-
   const handleInput = (e) => {
     isUpdatingRef.current = true;
     const newHtml = e.target.innerHTML;
@@ -112,15 +74,12 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
   const handlePaste = (e) => {
     e.preventDefault();
     
-    // Get HTML from clipboard
     const html = e.clipboardData.getData('text/html');
     
     if (html) {
-      // Create a temporary div to parse the HTML
       const temp = document.createElement('div');
       temp.innerHTML = html;
       
-      // Process the content to keep only italics and small caps
       const processNode = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
           return document.createTextNode(node.textContent);
@@ -128,14 +87,15 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         
         if (node.nodeType === Node.ELEMENT_NODE) {
           const tagName = node.tagName.toLowerCase();
-          const style = node.style.fontVariant;
-          const isItalic = tagName === 'i' || tagName === 'em' || node.style.fontStyle === 'italic';
-          const isSmallCaps = style === 'small-caps';
+          const style = node.style;
+          const isItalic = tagName === 'i' || tagName === 'em' || 
+                          style.fontStyle === 'italic' || 
+                          node.getAttribute('style')?.includes('font-style: italic');
+          const isSmallCaps = style.fontVariant === 'small-caps' || 
+                             node.getAttribute('style')?.includes('font-variant: small-caps');
           
-          // Recursively process children
           const children = Array.from(node.childNodes).map(processNode);
           
-          // Wrap in appropriate tags if needed
           if (isItalic && isSmallCaps) {
             const em = document.createElement('em');
             const span = document.createElement('span');
@@ -153,7 +113,6 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
             children.forEach(child => span.appendChild(child));
             return span;
           } else {
-            // Return children without wrapper
             const fragment = document.createDocumentFragment();
             children.forEach(child => fragment.appendChild(child));
             return fragment;
@@ -168,22 +127,37 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         processed.appendChild(processNode(node));
       });
       
-      // Insert the processed content
       const selection = window.getSelection();
       if (selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         range.deleteContents();
         range.insertNode(processed);
-        
-        // Move cursor to end of inserted content
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
       }
     } else {
-      // Fallback to plain text
       const text = e.clipboardData.getData('text/plain');
       document.execCommand('insertText', false, text);
+    }
+  };
+
+  const handleCopy = (e) => {
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const container = document.createElement('div');
+      container.appendChild(range.cloneContents());
+      
+      const elementsWithBg = container.querySelectorAll('[style*="background"]');
+      elementsWithBg.forEach(el => {
+        el.style.backgroundColor = '';
+        el.style.background = '';
+      });
+      
+      e.clipboardData.setData('text/plain', container.textContent);
+      e.clipboardData.setData('text/html', container.innerHTML);
+      e.preventDefault();
     }
   };
 
@@ -229,6 +203,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         contentEditable
         onInput={handleInput}
         onPaste={handlePaste}
+        onCopy={handleCopy}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
         className="w-full min-h-[1.8rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm leading-tight"
@@ -267,7 +242,6 @@ function CommentViewer() {
   const [tempUsername, setTempUsername] = useState('');
   const pendingEditRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showNonBreakingSpaces, setShowNonBreakingSpaces] = useState(false);
 
   const applyFormat = (command) => {
     document.execCommand(command, false, null);
@@ -290,7 +264,6 @@ function CommentViewer() {
       try {
         range.surroundContents(span);
       } catch (e) {
-        // If surroundContents fails, try a different approach
         const content = range.extractContents();
         span.appendChild(content);
         range.insertNode(span);
@@ -560,13 +533,9 @@ function CommentViewer() {
     
     const query = searchQuery.toLowerCase();
     return comments.filter(comment => {
-      // Search in comment ID
       if (comment.id.toLowerCase().includes(query)) return true;
-      
-      // Search in comment location
       if (comment.location.toLowerCase().includes(query)) return true;
       
-      // Search in all items
       return comment.items.some(item => {
         return (
           item.id?.toLowerCase().includes(query) ||
@@ -625,8 +594,7 @@ function CommentViewer() {
   };
 
   const updateCell = (commentId, itemIndex, column, value) => {
-    // If no username set and this is a content column (not 'id'), prompt for username
-    if (!currentUsername && column !== 'id' && value && value.trim()) {
+    if (!currentUsername && column !== 'id' && column !== 'isHeading' && value && value.trim()) {
       pendingEditRef.current = { commentId, itemIndex, column, value };
       setShowUsernameDialog(true);
       return;
@@ -637,8 +605,7 @@ function CommentViewer() {
         const newItems = [...comment.items];
         const updatedItem = { ...newItems[itemIndex], [column]: value };
         
-        // Track who edited this column (only for content columns, not 'id' or 'isHeading')
-        if (currentUsername && column !== 'id' && !column.startsWith('_')) {
+        if (currentUsername && column !== 'id' && column !== 'isHeading' && !column.startsWith('_')) {
           const editorKey = `_${column}Editor`;
           updatedItem[editorKey] = currentUsername;
         }
@@ -656,7 +623,6 @@ function CommentViewer() {
       setCurrentUsername(tempUsername.trim());
       setShowUsernameDialog(false);
       
-      // Apply the pending edit
       if (pendingEditRef.current) {
         const { commentId, itemIndex, column, value } = pendingEditRef.current;
         const newComments = comments.map(comment => {
@@ -713,7 +679,7 @@ function CommentViewer() {
   );
 
   return (
-    <div className={`h-screen flex flex-col bg-gray-50 ${showNonBreakingSpaces ? 'show-nbsp' : ''}`}>
+    <div className="h-screen flex flex-col bg-gray-50">
       <div className="bg-gray-600 border-b border-gray-700 px-3 py-1.5">
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <h1 className="text-sm font-semibold text-white">Law Review Comments</h1>
@@ -747,9 +713,6 @@ function CommentViewer() {
           <button onClick={applySmallCaps}
             className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-white text-xs"
             title="Small Caps">SC</button>
-          <button onClick={() => setShowNonBreakingSpaces(!showNonBreakingSpaces)}
-            className={`px-2 py-0.5 ${showNonBreakingSpaces ? 'bg-blue-500' : 'bg-gray-700'} hover:bg-gray-800 border border-gray-600 rounded text-white text-xs`}
-            title="Show Nonbreaking Spaces">°</button>
           <button onClick={() => applyFormat('removeFormat')}
             className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-red-400 text-xs"
             title="Clear">✕</button>
@@ -917,7 +880,6 @@ function CommentViewer() {
                                 <div>
                                   <div>{label}</div>
                                   {(() => {
-                                    // Find the most recent editor for this column in this comment
                                     const editorKey = `_${key}Editor`;
                                     const editors = comment.items
                                       .map(item => item[editorKey])
@@ -956,7 +918,7 @@ function CommentViewer() {
                           <td className="px-1.5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top">
                             <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
                               className={`w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs ${item.isHeading ? 'font-bold' : ''}`}
-                              placeholder="ID" />
+                              placeholder="#" />
                           </td>
                           {!collapsedColumns.has('admin') && (
                             <td className="px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top">
