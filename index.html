@@ -256,15 +256,21 @@ function CommentViewer() {
 
   const toggleRed = () => {
     const selection = window.getSelection();
-    if (selection.rangeCount > 0) {
+    if (selection.rangeCount > 0 && !selection.isCollapsed) {
       const range = selection.getRangeAt(0);
-      const container = range.commonAncestorContainer;
-      const parent = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
+      const span = document.createElement('span');
+      const fragment = range.cloneContents();
+      span.appendChild(fragment);
       
-      // Check if already red
-      if (parent && (parent.style.color === 'red' || parent.color === 'red')) {
-        // Remove red
+      // Check if selection contains red text
+      const hasRed = span.querySelector('[style*="color: red"]') || 
+                     span.querySelector('font[color="red"]') ||
+                     (span.firstElementChild && window.getComputedStyle(span.firstElementChild).color === 'rgb(255, 0, 0)');
+      
+      if (hasRed) {
+        // Remove red - set to default/black
         document.execCommand('foreColor', false, 'black');
+        document.execCommand('removeFormat', false, null);
       } else {
         // Apply red
         document.execCommand('foreColor', false, 'red');
