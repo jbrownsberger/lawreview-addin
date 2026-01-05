@@ -49,10 +49,9 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl/Cmd + N - New comment
-      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-        e.preventDefault();
-        createNewCommentFromSelection();
+      // Don't intercept if user is typing in an input or contenteditable
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
       }
       
       // Ctrl/Cmd + F - Focus search
@@ -63,12 +62,6 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         }
       }
       
-      // Ctrl/Cmd + R - Refresh
-      if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-        e.preventDefault();
-        loadCommentsFromWord();
-      }
-      
       // Ctrl/Cmd + M - Mark selected cells as implemented
       if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
         e.preventDefault();
@@ -76,7 +69,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
       }
       
       // Ctrl/Cmd + Z - Undo
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
       }
@@ -86,7 +79,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedCells, comments, historyIndex]);
+  }, [selectedCells, comments, historyIndex, officeReady]);
 
   useEffect(() => {
     if (editorRef.current && !editorRef.current.innerHTML) {
