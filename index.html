@@ -958,6 +958,7 @@ function CommentViewer() {
                                   toggleCellImplemented(comment.id, idx, 'admin');
                                 }}
                                 className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._adminImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
                                 title={item._adminImplemented ? "Mark as not implemented" : "Mark as implemented"}
                               >
                                 ✓
@@ -976,6 +977,7 @@ function CommentViewer() {
                                   toggleCellImplemented(comment.id, idx, 'proof');
                                 }}
                                 className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._proofImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
                                 title={item._proofImplemented ? "Mark as not implemented" : "Mark as implemented"}
                               >
                                 ✓
@@ -994,6 +996,7 @@ function CommentViewer() {
                                   toggleCellImplemented(comment.id, idx, 'galley');
                                 }}
                                 className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
                                 title={item._galleyImplemented ? "Mark as not implemented" : "Mark as implemented"}
                               >
                                 ✓
