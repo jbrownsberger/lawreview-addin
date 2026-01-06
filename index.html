@@ -39,11 +39,11 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 38 - Shift+Enter to add row!");
+console.log("Law Review Add-in Version 38 - Green cell marking!");
 
 const { useState, useEffect, useMemo, useRef } = React;
 
-function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column, onShiftEnter }) {
+function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
@@ -176,11 +176,6 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
       document.execCommand('underline', false, null);
       return;
     }
-    if (e.key === 'Enter' && e.shiftKey) {
-      e.preventDefault();
-      onShiftEnter();
-      return;
-    }
     if (e.key === 'Tab') {
       e.preventDefault();
       const allCells = Array.from(document.querySelectorAll(`[data-cell-column="${column}"]`));
@@ -201,7 +196,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" style={{ paddingRight: '28px' }}>
       <div
         ref={editorRef}
         contentEditable
@@ -210,8 +205,6 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         onCopy={handleCopy}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
-        data-comment-id={commentId}
-        data-item-index={itemIndex}
         className="w-full min-h-[1.8rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm leading-tight"
         style={{ 
           wordWrap: 'break-word', 
@@ -287,14 +280,6 @@ function CommentViewer() {
         document.execCommand('foreColor', false, 'red');
       }
     }
-  };
-
-  const applyHighlight = () => {
-    toggleHighlight();
-  };
-
-  const applyRed = () => {
-    toggleRed();
   };
 
   const toggleCellImplemented = (commentId, itemIndex, column) => {
@@ -618,14 +603,6 @@ function CommentViewer() {
     });
     saveToHistory(newComments);
     setComments(newComments);
-    
-    // Focus the new row in the same column after a short delay
-    setTimeout(() => {
-      const cells = document.querySelectorAll(`[data-comment-id="${commentId}"][data-item-index="${afterIndex + 1}"]`);
-      if (cells.length > 0) {
-        cells[0].focus();
-      }
-    }, 50);
   };
 
   const toggleHeading = (commentId, itemIndex) => {
@@ -752,12 +729,12 @@ function CommentViewer() {
           <button onClick={() => applyFormat('italic')}
             className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded italic text-white text-xs"
             title="Italic">I</button>
-          <button onClick={applyHighlight}
+          <button onClick={toggleHighlight}
             className="px-2 py-0.5 bg-yellow-400 hover:bg-yellow-500 border border-yellow-500 rounded text-gray-900 text-xs font-medium"
-            title="Highlight">H</button>
-          <button onClick={applyRed}
+            title="Toggle Highlight">H</button>
+          <button onClick={toggleRed}
             className="px-2 py-0.5 bg-red-500 hover:bg-red-600 border border-red-600 rounded text-white text-xs font-medium"
-            title="Red Text">R</button>
+            title="Toggle Red Text">R</button>
           <button onClick={() => applyFormat('removeFormat')}
             className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-red-400 text-xs"
             title="Clear">✕</button>
@@ -776,4 +753,291 @@ function CommentViewer() {
       {showUsernameDialog && (
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl border border-gray-200">
-            <h2 className="text-lg font-semibold mb-4
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">Enter Your Name</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Your name will appear on cells you edit
+              </label>
+              <input 
+                type="text" 
+                value={tempUsername} 
+                onChange={(e) => setTempUsername(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    confirmUsername();
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                placeholder="Your name" 
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button 
+                onClick={() => { setShowUsernameDialog(false); pendingEditRef.current = null; setTempUsername(''); }}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm">
+                Cancel
+              </button>
+              <button 
+                onClick={confirmUsername}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium">
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateDialog && (
+        <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-gray-200">
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">Create New Comment</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Comment ID (e.g., "125A")
+              </label>
+              <input 
+                ref={commentIdInputRef}
+                type="text" 
+                value={newCommentId} 
+                onChange={(e) => setNewCommentId(e.target.value)}
+                onKeyDown={handleDialogKeyDown}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                placeholder="125A" 
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <input 
+                type="text" 
+                value={newCommentLocation} 
+                onChange={(e) => setNewCommentLocation(e.target.value)}
+                onKeyDown={handleDialogKeyDown}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent" 
+              />
+              <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                💡 A Word comment will appear in the margin. To delete later, just delete the Word comment and click Refresh.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button 
+                onClick={() => { setShowCreateDialog(false); setNewCommentId(''); setNewCommentLocation(''); }}
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm">
+                Cancel
+              </button>
+              <button 
+                onClick={finalizeCreateComment}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium">
+                Create Comment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto p-2">
+        {loading ? (
+          <div className="text-center text-gray-500 mt-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-600 mb-2"></div>
+            <p className="text-sm">Loading comments...</p>
+          </div>
+        ) : comments.length === 0 ? (
+          <div className="text-center text-gray-500 mt-8 bg-white p-6 rounded border border-gray-200 max-w-sm mx-auto">
+            <p className="text-base mb-2">📋 No comments yet</p>
+            <p className="text-xs mb-1">Select some text and click "New Comment" to get started.</p>
+            <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
+          </div>
+        ) : filteredComments.length === 0 ? (
+          <div className="text-center text-gray-500 mt-8">No comments found.</div>
+        ) : (
+          filteredComments.map(comment => (
+            <div
+              key={comment.id}
+              id={`comment-${comment.id}`}
+              className="mb-2 bg-white rounded border border-gray-200 shadow-sm"
+            >
+              <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded"
+                  onClick={() => toggleExpand(comment.id)}>
+                  {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
+                  <div className="text-xs">
+                    <span
+                      className="font-semibold text-gray-700 cursor-pointer hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        jumpToComment(comment.id);
+                      }}
+                    >
+                      {comment.id}
+                    </span>
+                    <span className="mx-1 text-gray-400">•</span>
+                    <span className="text-gray-600">{comment.location}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
+                    {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </div>
+
+              {expandedComments.has(comment.id) && (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead className="bg-gray-100 border-b border-gray-300">
+                      <tr>
+                        <th className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-200" style={{ minWidth: '50px', width: '50px' }}>#</th>
+                        {[
+                          { key: 'admin', label: 'Admin' },
+                          { key: 'proof', label: 'Proof' },
+                          { key: 'galley', label: 'Galley' }
+                        ].map(({ key, label }) => (
+                          !collapsedColumns.has(key) && (
+                            <th key={key}
+                              className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-200"
+                              style={{ minWidth: '250px' }} 
+                              onClick={(e) => { e.stopPropagation(); toggleColumn(key); }}>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div>{label}</div>
+                                  {(() => {
+                                    const editorKey = `_${key}Editor`;
+                                    const editors = comment.items
+                                      .map(item => item[editorKey])
+                                      .filter(Boolean);
+                                    const lastEditor = editors[editors.length - 1];
+                                    return lastEditor ? (
+                                      <div className="text-xs font-normal text-gray-500 italic">
+                                        {lastEditor}
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                </div>
+                                <ChevronUp />
+                              </div>
+                            </th>
+                          )
+                        ))}
+                        {collapsedColumns.size > 0 && (
+                          <th className="px-1 py-1 text-center font-semibold text-gray-500 border-r border-gray-200">
+                            <div className="flex flex-col gap-0.5">
+                              {Array.from(collapsedColumns).map(col => (
+                                <button key={col} onClick={(e) => { e.stopPropagation(); toggleColumn(col); }}
+                                  className="px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1">
+                                  <ChevronDown /> {col.charAt(0).toUpperCase() + col.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </th>
+                        )}
+                        <th className="px-1 py-1 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comment.items.map((item, idx) => (
+                        <tr key={idx} className={item.isHeading ? 'bg-blue-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')}>
+                          <td className="px-1.5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: '50px', width: '50px' }}>
+                            <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
+                              className={`w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs ${item.isHeading ? 'font-bold' : ''}`}
+                              placeholder="#" />
+                          </td>
+                          {!collapsedColumns.has('admin') && (
+                            <td className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative ${item._adminImplemented ? 'bg-green-100' : ''}`}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCellImplemented(comment.id, idx, 'admin');
+                                }}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._adminImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
+                                title={item._adminImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                              >
+                                ✓
+                              </button>
+                              <div className={item.isHeading ? 'font-semibold' : ''}>
+                                <RichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} 
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" />
+                              </div>
+                            </td>
+                          )}
+                          {!collapsedColumns.has('proof') && (
+                            <td className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative ${item._proofImplemented ? 'bg-green-100' : ''}`}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCellImplemented(comment.id, idx, 'proof');
+                                }}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._proofImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
+                                title={item._proofImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                              >
+                                ✓
+                              </button>
+                              <div className={item.isHeading ? 'font-semibold' : ''}>
+                                <RichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} 
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" />
+                              </div>
+                            </td>
+                          )}
+                          {!collapsedColumns.has('galley') && (
+                            <td className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative ${item._galleyImplemented ? 'bg-green-100' : ''}`}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCellImplemented(comment.id, idx, 'galley');
+                                }}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
+                                title={item._galleyImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                              >
+                                ✓
+                              </button>
+                              <div className={item.isHeading ? 'font-semibold' : ''}>
+                                <RichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} 
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" />
+                              </div>
+                            </td>
+                          )}
+                          {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
+                          <td className="px-0.5 py-0 text-center align-top">
+                            <div className="flex flex-col gap-0.5 py-1">
+                              <button type="button" onClick={() => toggleHeading(comment.id, idx)}
+                                className={`${item.isHeading ? 'text-blue-600' : 'text-gray-500'} hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-xs font-bold`} 
+                                title={item.isHeading ? "Convert to regular row" : "Convert to heading"}>
+                                H
+                              </button>
+                              <button type="button" onClick={() => addRowAfter(comment.id, idx)}
+                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-0.5 rounded text-xs" title="Add row below">
+                                +
+                              </button>
+                              <button type="button" onClick={() => deleteRow(comment.id, idx)}
+                                className="text-red-600 hover:text-red-800 hover:bg-red-50 p-0.5 rounded text-xs font-bold" title="Delete row">
+                                ×
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="bg-white border-t border-gray-300 px-2 py-1 text-xs text-gray-600">
+        {officeReady ? "✓ Ready" : "⚠ Loading..."} • 
+        {filteredComments.length} comment{filteredComments.length !== 1 ? 's' : ''} • 
+        Data stored in Word comments • Click cells to mark as implemented (green)
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<CommentViewer />, document.getElementById('root'));
+</script>
+</body>
+</html>
