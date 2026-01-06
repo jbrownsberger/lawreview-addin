@@ -201,17 +201,28 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
       focusNextCellInColumn();
       return;
     }
-    if (e.shiftKey && (e.key === 'Enter' || e.keyCode === 13)) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (onAddRowAfter) {
-        onAddRowAfter(commentId, itemIndex);
-        // Focus the new row's cell in the same column after React re-renders
-        setTimeout(() => {
-          focusNextCellInColumn();
-        }, DOM_UPDATE_DELAY);
+    // Check for Enter key
+    const isEnter = e.key === 'Enter' || e.keyCode === 13 || e.which === 13;
+    
+    if (isEnter) {
+      // If Shift is NOT pressed, create new row
+      // If Shift IS pressed, allow default behavior (line break in cell)
+      if (!e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (onAddRowAfter) {
+          try {
+            onAddRowAfter(commentId, itemIndex);
+            // Focus the new row's cell in the same column after React re-renders
+            setTimeout(() => {
+              focusNextCellInColumn();
+            }, DOM_UPDATE_DELAY);
+          } catch (error) {
+            console.error('Error adding row:', error);
+          }
+        }
+        return;
       }
-      return;
     }
   };
 
