@@ -43,7 +43,7 @@ console.log("Law Review Add-in Version 38 - Green cell marking!");
 
 const { useState, useEffect, useMemo, useRef } = React;
 
-function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column }) {
+function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column, onAddRowAfter }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
@@ -191,6 +191,31 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
           sel.removeAllRanges();
           sel.addRange(range);
         }
+      }
+    }
+    if (e.shiftKey && e.key === 'Enter') {
+      e.preventDefault();
+      if (onAddRowAfter) {
+        onAddRowAfter(commentId, itemIndex);
+        // Focus the new row's cell in the same column after a short delay to allow DOM update
+        setTimeout(() => {
+          const allCells = Array.from(document.querySelectorAll(`[data-cell-column="${column}"]`));
+          const currentIndex = allCells.indexOf(editorRef.current);
+          if (currentIndex >= 0 && currentIndex < allCells.length - 1) {
+            const nextCell = allCells[currentIndex + 1];
+            if (nextCell) {
+              nextCell.focus();
+              const range = document.createRange();
+              const sel = window.getSelection();
+              if (nextCell.childNodes.length > 0) {
+                range.selectNodeContents(nextCell);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+              }
+            }
+          }
+        }, 50);
       }
     }
   };
@@ -964,7 +989,7 @@ function CommentViewer() {
                               </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} 
-                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" />
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" onAddRowAfter={addRowAfter} />
                               </div>
                             </td>
                           )}
@@ -982,7 +1007,7 @@ function CommentViewer() {
                               </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} 
-                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" />
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" onAddRowAfter={addRowAfter} />
                               </div>
                             </td>
                           )}
@@ -1000,7 +1025,7 @@ function CommentViewer() {
                               </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} 
-                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" />
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" onAddRowAfter={addRowAfter} />
                               </div>
                             </td>
                           )}
