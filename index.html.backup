@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+<! DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8" />
 <title>Law Review Comment Viewer - v40</title>
 
-<script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office. js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -12,25 +12,25 @@
 
 <style>
 body {
-  margin: 0;
+  margin:  0;
   padding: 0;
-  font-family: Helvetica, Arial, sans-serif;
-  background: #f8f9fa;
+  font-family:  Helvetica, Arial, sans-serif;
+  background:  #f8f9fa;
 }
 [contenteditable] { outline: none; }
-[contenteditable]:focus { background-color: #f0f0f0; }
+[contenteditable]: focus { background-color: #f0f0f0; }
 
-::-webkit-scrollbar { width: 8px; }
+: :-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }
-::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+: :-webkit-scrollbar-thumb { background:  #6b7280; border-radius: 4px; }
+: :-webkit-scrollbar-thumb:hover { background: #4b5563; }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
+  from { opacity:  0; }
   to { opacity: 1; }
 }
 .fade-in { animation: fadeIn 0.2s ease-in; }
-.save-indicator { transition: opacity 0.3s ease; }
+. save-indicator { transition: opacity 0.3s ease; }
 </style>
 </head>
 <body>
@@ -67,7 +67,7 @@ function createEmptyItem() {
     isHeading: false,
     _adminEditor: "",
     _proofEditor: "",
-    _galleyEditor: "",
+    _galleyEditor:  "",
     _adminImplemented: false,
     _proofImplemented: false,
     _galleyImplemented: false
@@ -111,8 +111,8 @@ function RichTextCell({ value, onChange, placeholder, column }) {
   const isUpdatingRef = useRef(false);
 
   useEffect(() => {
-    if (editorRef.current && !editorRef.current.innerHTML) {
-      editorRef.current.innerHTML = value || "";
+    if (editorRef.current && !editorRef.current. innerHTML) {
+      editorRef.current. innerHTML = value || "";
     }
   }, []);
 
@@ -120,7 +120,7 @@ function RichTextCell({ value, onChange, placeholder, column }) {
     if (editorRef.current && !isUpdatingRef.current && document.activeElement !== editorRef.current) {
       const currentHtml = editorRef.current.innerHTML;
       if (currentHtml !== value && value !== undefined) {
-        editorRef.current.innerHTML = value || "";
+        editorRef.current. innerHTML = value || "";
       }
     }
   }, [value]);
@@ -147,18 +147,18 @@ function RichTextCell({ value, onChange, placeholder, column }) {
           return document.createTextNode(node.textContent);
         }
 
-        if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node. nodeType === Node. ELEMENT_NODE) {
           const tagName = node.tagName.toLowerCase();
           const style = node.style;
           const styleAttr = node.getAttribute("style") || "";
           const isBold = tagName === "b" || tagName === "strong" ||
-            style.fontWeight === "bold" || style.fontWeight === "700" ||
-            styleAttr.includes("font-weight: bold");
+            style. fontWeight === "bold" || style.fontWeight === "700" ||
+            styleAttr. includes("font-weight:  bold");
           const isItalic = tagName === "i" || tagName === "em" ||
             style.fontStyle === "italic" ||
             styleAttr.includes("font-style: italic");
 
-          const children = Array.from(node.childNodes).map(processNode);
+          const children = Array.from(node. childNodes).map(processNode);
 
           if (isBold && isItalic) {
             const strong = document.createElement("strong");
@@ -172,7 +172,7 @@ function RichTextCell({ value, onChange, placeholder, column }) {
             return strong;
           } else if (isItalic) {
             const em = document.createElement("em");
-            children.forEach((child) => em.appendChild(child));
+            children. forEach((child) => em.appendChild(child));
             return em;
           } else {
             const fragment = document.createDocumentFragment();
@@ -185,7 +185,7 @@ function RichTextCell({ value, onChange, placeholder, column }) {
       };
 
       const processed = document.createDocumentFragment();
-      Array.from(temp.childNodes).forEach((node) => {
+      Array.from(temp. childNodes).forEach((node) => {
         processed.appendChild(processNode(node));
       });
 
@@ -199,7 +199,7 @@ function RichTextCell({ value, onChange, placeholder, column }) {
         selection.addRange(range);
       }
     } else {
-      const text = e.clipboardData.getData("text/plain");
+      const text = e.clipboardData. getData("text/plain");
       document.execCommand("insertText", false, text);
     }
   }, []);
@@ -217,32 +217,32 @@ function RichTextCell({ value, onChange, placeholder, column }) {
       });
 
       e.clipboardData.setData("text/plain", container.textContent);
-      e.clipboardData.setData("text/html", container.innerHTML);
+      e.clipboardData. setData("text/html", container.innerHTML);
       e.preventDefault();
     }
   }, []);
 
   const handleKeyDown = useCallback((e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+    if ((e.metaKey || e. ctrlKey) && e.key === "b") {
       e.preventDefault();
       document.execCommand("bold", false, null);
       return;
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === "i") {
+    if ((e.metaKey || e. ctrlKey) && e.key === "i") {
       e.preventDefault();
       document.execCommand("italic", false, null);
       return;
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === "u") {
+    if ((e.metaKey || e. ctrlKey) && e.key === "u") {
       e.preventDefault();
       document.execCommand("underline", false, null);
       return;
     }
     if (e.key === "Tab") {
       e.preventDefault();
-      const allCells = Array.from(document.querySelectorAll('[data-cell-column="' + column + '"]'));
-      const currentIndex = allCells.indexOf(editorRef.current);
-      const nextIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
+      const allCells = Array.from(document. querySelectorAll('[data-cell-column="' + column + '"]'));
+      const currentIndex = allCells. indexOf(editorRef.current);
+      const nextIndex = e.shiftKey ?  currentIndex - 1 : currentIndex + 1;
 
       if (nextIndex >= 0 && nextIndex < allCells.length) {
         const nextCell = allCells[nextIndex];
@@ -269,7 +269,7 @@ function RichTextCell({ value, onChange, placeholder, column }) {
         onCopy={handleCopy}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
-        className="w-full min-h-[1.8rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm leading-tight"
+        className="w-full min-h-[1. 8rem] bg-transparent focus: bg-gray-100 focus: ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm leading-tight"
         style={{
           wordWrap: "break-word",
           whiteSpace: "pre-wrap",
@@ -322,7 +322,7 @@ function CommentViewer() {
   useEffect(() => {
     if (currentUsername) {
       try {
-        localStorage.setItem("lawReviewUsername", currentUsername);
+        localStorage. setItem("lawReviewUsername", currentUsername);
       } catch (e) {
         console.error("Could not save username to localStorage");
       }
@@ -338,7 +338,7 @@ function CommentViewer() {
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const container = range.commonAncestorContainer;
-      const parent = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
+      const parent = container.nodeType === Node.TEXT_NODE ? container. parentElement : container;
 
       if (parent && parent.style.backgroundColor === "yellow") {
         document.execCommand("hiliteColor", false, "transparent");
@@ -356,21 +356,21 @@ function CommentViewer() {
       const fragment = range.cloneContents();
       span.appendChild(fragment);
 
-      const hasRed = span.querySelector('[style*="color: red"]') ||
+      const hasRed = span. querySelector('[style*="color: red"]') ||
         span.querySelector('font[color="red"]') ||
         (span.firstElementChild && window.getComputedStyle(span.firstElementChild).color === "rgb(255, 0, 0)");
 
       if (hasRed) {
         document.execCommand("foreColor", false, "black");
       } else {
-        document.execCommand("foreColor", false, "red");
+        document. execCommand("foreColor", false, "red");
       }
     }
   }, []);
 
   const toggleCellImplemented = useCallback((commentId, itemIndex, column) => {
     setComments((prevComments) => prevComments.map((comment) => {
-      if (comment.id === commentId) {
+      if (comment. id === commentId) {
         const newItems = [...comment.items];
         const item = newItems[itemIndex];
         const implKey = "_" + column + "Implemented";
@@ -396,7 +396,7 @@ function CommentViewer() {
   const undo = useCallback(() => {
     if (historyIndex > 0) {
       const previousState = history[historyIndex - 1];
-      setComments(JSON.parse(JSON.stringify(previousState)));
+      setComments(JSON.parse(JSON. stringify(previousState)));
       setHistoryIndex(historyIndex - 1);
     }
   }, [history, historyIndex]);
@@ -418,7 +418,7 @@ function CommentViewer() {
           redo();
         } else {
           const activeEl = document.activeElement;
-          if (!activeEl || activeEl.contentEditable !== "true") {
+          if (! activeEl || activeEl.contentEditable !== "true") {
             e.preventDefault();
             undo();
           }
@@ -433,7 +433,7 @@ function CommentViewer() {
   // Office ready
   useEffect(() => {
     Office.onReady((info) => {
-      if (info.host === Office.HostType.Word) {
+      if (info.host === Office. HostType.Word) {
         setOfficeReady(true);
         loadCommentsFromWord();
       }
@@ -442,7 +442,7 @@ function CommentViewer() {
 
   // Auto-save
   useEffect(() => {
-    if (!officeReady || comments.length === 0) return;
+    if (! officeReady || comments.length === 0) return;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -455,7 +455,7 @@ function CommentViewer() {
 
     return () => {
       if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+        clearTimeout(saveTimeoutRef. current);
       }
     };
   }, [comments, officeReady]);
@@ -464,13 +464,13 @@ function CommentViewer() {
     setLoading(true);
     try {
       await Word.run(async (context) => {
-        const wordComments = context.document.body.getComments();
+        const wordComments = context.document.body. getComments();
         wordComments.load("items");
         await context.sync();
 
         const commentData = [];
         for (let i = 0; i < wordComments.items.length; i++) {
-          const comment = wordComments.items[i];
+          const comment = wordComments. items[i];
           comment.load("content");
           const range = comment.getRange();
           range.load("start");
@@ -495,11 +495,11 @@ function CommentViewer() {
           }
 
           commentData.push({
-            id: commentId,
+            id:  commentId,
             position: range.start,
             location: "Position " + range.start,
             timestamp: new Date().toISOString().split("T")[0],
-            items: tableData.items
+            items: tableData. items
           });
         }
 
@@ -521,16 +521,16 @@ function CommentViewer() {
   }
 
   async function saveCommentsToWordSilent() {
-    if (!officeReady) return;
+    if (! officeReady) return;
 
     setSaveStatus("saving");
     try {
-      await Word.run(async (context) => {
+      await Word. run(async (context) => {
         const wordComments = context.document.body.getComments();
         wordComments.load("items");
-        await context.sync();
+        await context. sync();
 
-        for (let i = 0; i < wordComments.items.length; i++) {
+        for (let i = 0; i < wordComments.items. length; i++) {
           const wordComment = wordComments.items[i];
           wordComment.load("content");
           await context.sync();
@@ -566,7 +566,7 @@ function CommentViewer() {
 
     try {
       await Word.run(async (context) => {
-        const range = context.document.getSelection();
+        const range = context.document. getSelection();
         range.load("text");
         await context.sync();
 
@@ -575,7 +575,7 @@ function CommentViewer() {
           return;
         }
 
-        let locationText = range.text.substring(0, LOCATION_PREVIEW_LENGTH);
+        let locationText = range.text. substring(0, LOCATION_PREVIEW_LENGTH);
         if (range.text.length > LOCATION_PREVIEW_LENGTH) {
           locationText += "...";
         }
@@ -590,7 +590,7 @@ function CommentViewer() {
   }
 
   async function finalizeCreateComment() {
-    if (!newCommentId.trim()) {
+    if (! newCommentId. trim()) {
       alert("Please enter a comment ID!");
       return;
     }
@@ -601,23 +601,23 @@ function CommentViewer() {
 
     try {
       await Word.run(async (context) => {
-        const range = context.document.getSelection();
+        const range = context.document. getSelection();
         range.insertComment(newCommentId);
-        await context.sync();
+        await context. sync();
 
         const timestamp = new Date();
         const newComment = {
           id: newCommentId,
           location: newCommentLocation,
-          timestamp: timestamp.toISOString().split("T")[0] + " " + timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          timestamp:  timestamp.toISOString().split("T")[0] + " " + timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute:  "2-digit" }),
           items: [createEmptyItem()]
         };
 
-        const updatedComments = [...comments, newComment];
+        const updatedComments = [... comments, newComment];
         setComments(updatedComments);
         saveToHistory(updatedComments);
 
-        setExpandedComments((prev) => new Set([...prev, newCommentId]));
+        setExpandedComments((prev) => new Set([... prev, newCommentId]));
 
         setShowCreateDialog(false);
         setNewCommentId("");
@@ -634,15 +634,15 @@ function CommentViewer() {
   async function jumpToComment(commentId) {
     try {
       await Word.run(async (context) => {
-        const wordComments = context.document.body.getComments();
+        const wordComments = context. document.body.getComments();
         wordComments.load("items");
         await context.sync();
 
         let found = false;
         for (let i = 0; i < wordComments.items.length; i++) {
-          const comment = wordComments.items[i];
+          const comment = wordComments. items[i];
           comment.load("content");
-          await context.sync();
+          await context. sync();
 
           const content = comment.content;
           const actualCommentId = content.includes("|||") ? content.split("|||")[0] : content;
@@ -666,12 +666,12 @@ function CommentViewer() {
   }
 
   const filteredComments = useMemo(() => {
-    if (!debouncedSearchQuery.trim()) return comments;
+    if (! debouncedSearchQuery.trim()) return comments;
 
     const query = debouncedSearchQuery.toLowerCase();
     return comments.filter((comment) => {
       if (comment.id.toLowerCase().includes(query)) return true;
-      if (comment.location.toLowerCase().includes(query)) return true;
+      if (comment.location. toLowerCase().includes(query)) return true;
 
       return comment.items.some((item) => {
         const stripHtml = (html) => {
@@ -682,8 +682,8 @@ function CommentViewer() {
 
         return (
           (item.id && item.id.toLowerCase().includes(query)) ||
-          stripHtml(item.admin).toLowerCase().includes(query) ||
-          stripHtml(item.proof).toLowerCase().includes(query) ||
+          stripHtml(item. admin).toLowerCase().includes(query) ||
+          stripHtml(item. proof).toLowerCase().includes(query) ||
           stripHtml(item.galley).toLowerCase().includes(query)
         );
       });
@@ -693,7 +693,7 @@ function CommentViewer() {
   const toggleExpand = useCallback((commentId) => {
     setExpandedComments((prev) => {
       const newExpanded = new Set(prev);
-      if (newExpanded.has(commentId)) {
+      if (newExpanded. has(commentId)) {
         newExpanded.delete(commentId);
       } else {
         newExpanded.add(commentId);
@@ -724,9 +724,9 @@ function CommentViewer() {
 
   const addRowAfter = useCallback((commentId, afterIndex) => {
     setComments((prevComments) => {
-      const newComments = prevComments.map((comment) => {
+      const newComments = prevComments. map((comment) => {
         if (comment.id === commentId) {
-          const newItems = [...comment.items];
+          const newItems = [... comment.items];
           newItems.splice(afterIndex + 1, 0, createEmptyItem());
           return { ...comment, items: newItems };
         }
@@ -739,10 +739,10 @@ function CommentViewer() {
 
   const toggleHeading = useCallback((commentId, itemIndex) => {
     setComments((prevComments) => {
-      const newComments = prevComments.map((comment) => {
+      const newComments = prevComments. map((comment) => {
         if (comment.id === commentId) {
-          const newItems = [...comment.items];
-          newItems[itemIndex] = {...newItems[itemIndex], isHeading: !newItems[itemIndex].isHeading};
+          const newItems = [... comment.items];
+          newItems[itemIndex] = { ...newItems[itemIndex], isHeading: !newItems[itemIndex]. isHeading };
           return { ...comment, items: newItems };
         }
         return comment;
@@ -753,16 +753,16 @@ function CommentViewer() {
   }, [saveToHistory]);
 
   const updateCell = useCallback((commentId, itemIndex, column, value) => {
-    if (!currentUsername && column !== "id" && column !== "isHeading" && !column.startsWith("_") && value && value.trim()) {
-      pendingEditRef.current = { commentId: commentId, itemIndex: itemIndex, column: column, value: value };
+    if (! currentUsername && column !== "id" && column !== "isHeading" && ! column.startsWith("_") && value && value. trim()) {
+      pendingEditRef.current = { commentId:  commentId, itemIndex:  itemIndex, column:  column, value: value };
       setShowUsernameDialog(true);
       return;
     }
 
     setComments((prevComments) => prevComments.map((comment) => {
-      if (comment.id === commentId) {
-        const newItems = [...comment.items];
-        const updatedItem = {...newItems[itemIndex], [column]: value};
+      if (comment. id === commentId) {
+        const newItems = [...comment. items];
+        const updatedItem = { ...newItems[itemIndex], [column]:  value };
 
         if (currentUsername && column !== "id" && column !== "isHeading" && !column.startsWith("_")) {
           const editorKey = "_" + column + "Editor";
@@ -770,7 +770,7 @@ function CommentViewer() {
         }
 
         newItems[itemIndex] = updatedItem;
-        return {...comment, items: newItems};
+        return { ... comment, items: newItems };
       }
       return comment;
     }));
@@ -803,10 +803,10 @@ function CommentViewer() {
 
   const deleteRow = useCallback((commentId, itemIndex) => {
     setComments((prevComments) => {
-      const newComments = prevComments.map((comment) => {
+      const newComments = prevComments. map((comment) => {
         if (comment.id === commentId) {
           if (comment.items.length <= 1) {
-            alert("Cannot delete the last row. Delete the comment from Word instead.");
+            alert("Cannot delete the last row.  Delete the comment from Word instead.");
             return comment;
           }
           const newItems = comment.items.filter((_, idx) => idx !== itemIndex);
@@ -821,10 +821,10 @@ function CommentViewer() {
   }, [saveToHistory]);
 
   const handleDialogKeyDown = useCallback((e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
+    if (e. key === "Enter") {
+      e. preventDefault();
       finalizeCreateComment();
-    } else if (e.key === "Escape") {
+    } else if (e. key === "Escape") {
       setShowCreateDialog(false);
       setNewCommentId("");
       setNewCommentLocation("");
@@ -840,7 +840,7 @@ function CommentViewer() {
   const exportComments = useCallback(() => {
     const dataStr = JSON.stringify(comments, null, 2);
     const dataBlob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(dataBlob);
+    const url = URL. createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
     link.download = "law-review-comments-" + new Date().toISOString().split("T")[0] + ".json";
@@ -858,8 +858,8 @@ function CommentViewer() {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-gray-600 border-b border-gray-700 px-3 py-1.5">
-        <div className="flex items-center justify-between gap-2 mb-1.5">
+      <div className="bg-gray-600 border-b border-gray-700 px-3 py-1. 5">
+        <div className="flex items-center justify-between gap-2 mb-1. 5">
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold text-white">Law Review Comments</h1>
             <SaveIndicator status={saveStatus} />
@@ -880,7 +880,7 @@ function CommentViewer() {
             <button
               onClick={undo}
               disabled={historyIndex <= 0}
-              className={(historyIndex <= 0 ? "bg-gray-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
+              className={(historyIndex <= 0 ? "bg-gray-400 cursor-not-allowed" : "bg-amber-500 hover: bg-amber-600 cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
               title="Undo (Ctrl+Z)"
             >
               ⎌
@@ -888,7 +888,7 @@ function CommentViewer() {
             <button
               onClick={redo}
               disabled={historyIndex >= history.length - 1}
-              className={(historyIndex >= history.length - 1 ? "bg-gray-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
+              className={(historyIndex >= history.length - 1 ?  "bg-gray-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
               title="Redo (Ctrl+Shift+Z)"
             >
               ↷
@@ -935,7 +935,7 @@ function CommentViewer() {
           </button>
           <button
             onClick={() => applyFormat("removeFormat")}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-red-400 text-xs transition-colors"
+            className="px-2 py-0.5 bg-gray-700 hover: bg-gray-800 border border-gray-600 rounded text-red-400 text-xs transition-colors"
             title="Clear Formatting"
           >
             ✕
@@ -1006,7 +1006,7 @@ function CommentViewer() {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     confirmUsername();
-                  } else if (e.key === "Escape") {
+                  } else if (e. key === "Escape") {
                     setShowUsernameDialog(false);
                     pendingEditRef.current = null;
                     setTempUsername("");
@@ -1030,7 +1030,7 @@ function CommentViewer() {
               </button>
               <button
                 onClick={confirmUsername}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-gray-600 text-white rounded hover: bg-gray-700 text-sm font-medium transition-colors"
               >
                 Confirm
               </button>
@@ -1054,7 +1054,7 @@ function CommentViewer() {
                 value={newCommentId}
                 onChange={(e) => setNewCommentId(e.target.value)}
                 onKeyDown={handleDialogKeyDown}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus: border-transparent"
                 placeholder="125A"
               />
             </div>
@@ -1068,7 +1068,7 @@ function CommentViewer() {
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
               />
               <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                💡 A Word comment will appear in the margin. To delete later, just delete the Word comment and click Refresh.
+                💡 A Word comment will appear in the margin.  To delete later, just delete the Word comment and click Refresh.
               </p>
             </div>
             <div className="flex gap-2 justify-end">
@@ -1097,7 +1097,7 @@ function CommentViewer() {
       {deleteConfirm && (
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 fade-in">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl border border-gray-200">
-            <h2 className="text-lg font-semibold mb-4 text-gray-800">Delete Row?</h2>
+            <h2 className="text-lg font-semibold mb-4 text-gray-800">Delete Row? </h2>
             <p className="text-sm text-gray-600 mb-4">Are you sure you want to delete this row?  This action can be undone.</p>
             <div className="flex gap-2 justify-end">
               <button
@@ -1107,7 +1107,7 @@ function CommentViewer() {
                 Cancel
               </button>
               <button
-                onClick={() => deleteRow(deleteConfirm.commentId, deleteConfirm.itemIndex)}
+                onClick={() => deleteRow(deleteConfirm. commentId, deleteConfirm.itemIndex)}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium transition-colors"
               >
                 Delete
@@ -1119,7 +1119,7 @@ function CommentViewer() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-2">
-        {loading ? (
+        {loading ?  (
           <div className="text-center text-gray-500 mt-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-600 mb-2"></div>
             <p className="text-sm">Loading comments...</p>
@@ -1127,15 +1127,15 @@ function CommentViewer() {
         ) : comments.length === 0 ? (
           <div className="text-center text-gray-500 mt-8 bg-white p-6 rounded border border-gray-200 max-w-sm mx-auto">
             <p className="text-base mb-2">📋 No comments yet</p>
-            <p className="text-xs mb-1">Select some text and click "New Comment" to get started.</p>
+            <p className="text-xs mb-1">Select some text and click "New Comment" to get started. </p>
             <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
           </div>
-        ) : filteredComments.length === 0 ? (
+        ) : filteredComments.length === 0 ?  (
           <div className="text-center text-gray-500 mt-8">
             <p>No comments match "{debouncedSearchQuery}"</p>
             <button
               onClick={() => setSearchQuery("")}
-              className="mt-2 text-sky-500 hover:text-sky-600 text-sm"
+              className="mt-2 text-sky-500 hover: text-sky-600 text-sm"
             >
               Clear search
             </button>
@@ -1143,14 +1143,14 @@ function CommentViewer() {
         ) : (
           filteredComments.map((comment) => (
             <div
-              key={comment.id}
+              key={comment. id}
               id={"comment-" + comment.id}
               className="mb-2 bg-white rounded border border-gray-200 shadow-sm"
             >
               {/* Comment Header */}
               <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-2">
                 <div
-                  className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                  className="flex items-center gap-2 flex-1 cursor-pointer hover: bg-gray-100 px-1 py-0.5 rounded transition-colors"
                   onClick={() => toggleExpand(comment.id)}
                 >
                   {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
@@ -1170,20 +1170,20 @@ function CommentViewer() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
-                    {comment.items.length} item{comment.items.length !== 1 ? "s" : ""}
+                    {comment.items.length} item{comment.items. length !== 1 ? "s" : ""}
                   </span>
                 </div>
               </div>
 
               {/* Comment Table */}
-              {expandedComments.has(comment.id) && (
+              {expandedComments. has(comment.id) && (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-xs">
                     <thead className="bg-gray-100 border-b border-gray-300">
                       <tr>
                         <th className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-200" style={{ minWidth: "50px", width: "50px" }}>#</th>
                         {columns.map((col) => (
-                          !collapsedColumns.has(col.key) && (
+                          ! collapsedColumns.has(col.key) && (
                             <th
                               key={col.key}
                               className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors"
@@ -1210,19 +1210,19 @@ function CommentViewer() {
                             </th>
                           )
                         ))}
-                        {collapsedColumns.size > 0 && (
+                        {collapsedColumns. size > 0 && (
                           <th className="px-1 py-1 text-center font-semibold text-gray-500 border-r border-gray-200">
                             <div className="flex flex-col gap-0.5">
                               {Array.from(collapsedColumns).map((col) => (
                                 <button
                                   key={col}
                                   onClick={(e) => {
-                                    e.stopPropagation();
+                                    e. stopPropagation();
                                     toggleColumn(col);
                                   }}
                                   className="px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1 transition-colors"
                                 >
-                                  <ChevronDown /> {col.charAt(0).toUpperCase() + col.slice(1)}
+                                  <ChevronDown /> {col. charAt(0).toUpperCase() + col.slice(1)}
                                 </button>
                               ))}
                             </div>
@@ -1233,8 +1233,8 @@ function CommentViewer() {
                     </thead>
                     <tbody>
                       {comment.items.map((item, idx) => (
-                        <tr key={idx} className={item.isHeading ? "bg-blue-50" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50")}>
-                          <td className="px-1.5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "50px", width: "50px" }}>
+                        <tr key={idx} className={item.isHeading ?  "bg-blue-50" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50")}>
+                          <td className="px-1. 5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth:  "50px", width: "50px" }}>
                             <input
                               type="text"
                               value={item.id}
@@ -1244,23 +1244,23 @@ function CommentViewer() {
                             />
                           </td>
                           {columns.map((col) => (
-                            !collapsedColumns.has(col.key) && (
+                            ! collapsedColumns. has(col.key) && (
                               <td
-                                key={col.key}
+                                key={col. key}
                                 className={"px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-green-100" : "")}
                               >
                                 <button
                                   onClick={(e) => {
-                                    e.stopPropagation();
+                                    e. stopPropagation();
                                     toggleCellImplemented(comment.id, idx, col.key);
                                   }}
-                                  className={"absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-green-600 text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")}
+                                  className={"absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-green-600 text-white" :  " bg-gray-200 text-gray-500 hover:bg-gray-300")}
                                   style={{ zIndex: 20, cursor: "pointer" }}
-                                  title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}
+                                  title={item["_" + col.key + "Implemented"] ?  "Mark as not implemented" :  "Mark as implemented"}
                                 >
                                   ✓
                                 </button>
-                                <div className={item.isHeading ? "font-semibold" : ""}>
+                                <div className={item. isHeading ? "font-semibold" : ""}>
                                   <MemoizedRichTextCell
                                     value={item[col.key]}
                                     onChange={(html) => updateCell(comment.id, idx, col.key, html)}
@@ -1271,7 +1271,7 @@ function CommentViewer() {
                               </td>
                             )
                           ))}
-                          {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
+                          {collapsedColumns. size > 0 && <td className="border-r border-gray-200"></td>}
                           <td className="px-1 py-0 align-top">
                             <div className="flex flex-col gap-0.5 py-1">
                               <button
@@ -1283,14 +1283,14 @@ function CommentViewer() {
                               </button>
                               <button
                                 onClick={() => toggleHeading(comment.id, idx)}
-                                className={"w-6 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-blue-500 text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")}
+                                className={"w-6 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ?  " bg-blue-500 text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")}
                                 title="Toggle heading"
                               >
                                 H
                               </button>
                               <button
-                                onClick={() => setDeleteConfirm({ commentId: comment.id, itemIndex: idx })}
-                                className="w-6 h-5 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors"
+                                onClick={() => setDeleteConfirm({ commentId: comment. id, itemIndex:  idx })}
+                                className="w-6 h-5 flex items-center justify-center bg-gray-100 hover: bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors"
                                 title="Delete row"
                               >
                                 ×
@@ -1310,7 +1310,7 @@ function CommentViewer() {
 
       {/* Footer */}
       <div className="bg-gray-100 border-t border-gray-200 px-3 py-1 text-xs text-gray-500 flex justify-between">
-        <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
+        <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items. length, 0)} total items</span>
         <span>v40</span>
       </div>
     </div>
