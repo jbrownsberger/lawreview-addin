@@ -43,7 +43,7 @@ console.log("Law Review Add-in Version 38 - Green cell marking!");
 
 const { useState, useEffect, useMemo, useRef } = React;
 
-function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column }) {
+function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column, onToggleImplemented }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
@@ -174,6 +174,13 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
     if ((e.metaKey || e.ctrlKey) && e.key === 'u') {
       e.preventDefault();
       document.execCommand('underline', false, null);
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
+      e.preventDefault();
+      if (onToggleImplemented) {
+        onToggleImplemented(commentId, itemIndex, column);
+      }
       return;
     }
     if (e.key === 'Tab') {
@@ -957,15 +964,16 @@ function CommentViewer() {
                                   e.stopPropagation();
                                   toggleCellImplemented(comment.id, idx, 'admin');
                                 }}
-                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._adminImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._adminImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
                                 style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
-                                title={item._adminImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                                title={item._adminImplemented ? "Mark as not implemented (Ctrl+M)" : "Mark as implemented (Ctrl+M)"}
                               >
                                 ✓
                               </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} 
-                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" />
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" 
+                                  onToggleImplemented={toggleCellImplemented} />
                               </div>
                             </td>
                           )}
@@ -976,15 +984,16 @@ function CommentViewer() {
                                   e.stopPropagation();
                                   toggleCellImplemented(comment.id, idx, 'proof');
                                 }}
-                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._proofImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._proofImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
                                 style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
-                                title={item._proofImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                                title={item._proofImplemented ? "Mark as not implemented (Ctrl+M)" : "Mark as implemented (Ctrl+M)"}
                               >
                                 ✓
                               </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} 
-                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" />
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" 
+                                  onToggleImplemented={toggleCellImplemented} />
                               </div>
                             </td>
                           )}
@@ -995,15 +1004,16 @@ function CommentViewer() {
                                   e.stopPropagation();
                                   toggleCellImplemented(comment.id, idx, 'galley');
                                 }}
-                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
                                 style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
-                                title={item._galleyImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                                title={item._galleyImplemented ? "Mark as not implemented (Ctrl+M)" : "Mark as implemented (Ctrl+M)"}
                               >
                                 ✓
                               </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} 
-                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" />
+                                  placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" 
+                                  onToggleImplemented={toggleCellImplemented} />
                               </div>
                             </td>
                           )}
