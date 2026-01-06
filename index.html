@@ -71,6 +71,25 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
     }, 0);
   };
 
+  const focusNextCellInColumn = () => {
+    const allCells = Array.from(document.querySelectorAll(`[data-cell-column="${column}"]`));
+    const currentIndex = allCells.indexOf(editorRef.current);
+    if (currentIndex >= 0 && currentIndex < allCells.length - 1) {
+      const nextCell = allCells[currentIndex + 1];
+      if (nextCell) {
+        nextCell.focus();
+        const range = document.createRange();
+        const sel = window.getSelection();
+        if (nextCell.childNodes.length > 0) {
+          range.selectNodeContents(nextCell);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    }
+  };
+
   const handlePaste = (e) => {
     e.preventDefault();
     
@@ -178,44 +197,17 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
     }
     if (e.key === 'Tab') {
       e.preventDefault();
-      const allCells = Array.from(document.querySelectorAll(`[data-cell-column="${column}"]`));
-      const currentIndex = allCells.indexOf(editorRef.current);
-      if (currentIndex >= 0 && currentIndex < allCells.length - 1) {
-        const nextCell = allCells[currentIndex + 1];
-        nextCell.focus();
-        const range = document.createRange();
-        const sel = window.getSelection();
-        if (nextCell.childNodes.length > 0) {
-          range.selectNodeContents(nextCell);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      }
+      focusNextCellInColumn();
     }
     if (e.shiftKey && e.key === 'Enter') {
       e.preventDefault();
       if (onAddRowAfter) {
         onAddRowAfter(commentId, itemIndex);
         // Focus the new row's cell in the same column after a short delay to allow DOM update
+        const DOM_UPDATE_DELAY = 50;
         setTimeout(() => {
-          const allCells = Array.from(document.querySelectorAll(`[data-cell-column="${column}"]`));
-          const currentIndex = allCells.indexOf(editorRef.current);
-          if (currentIndex >= 0 && currentIndex < allCells.length - 1) {
-            const nextCell = allCells[currentIndex + 1];
-            if (nextCell) {
-              nextCell.focus();
-              const range = document.createRange();
-              const sel = window.getSelection();
-              if (nextCell.childNodes.length > 0) {
-                range.selectNodeContents(nextCell);
-                range.collapse(false);
-                sel.removeAllRanges();
-                sel.addRange(range);
-              }
-            }
-          }
-        }, 50);
+          focusNextCellInColumn();
+        }, DOM_UPDATE_DELAY);
       }
     }
   };
