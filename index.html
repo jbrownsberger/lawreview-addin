@@ -81,14 +81,9 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         nextCell.focus();
         const range = document.createRange();
         const sel = window.getSelection();
-        if (nextCell.childNodes.length > 0) {
-          range.selectNodeContents(nextCell);
-          range.collapse(false);
-        } else {
-          // For empty cells, place cursor at the start of the cell
-          range.selectNodeContents(nextCell);
-          range.collapse(true);
-        }
+        range.selectNodeContents(nextCell);
+        // For empty cells, place cursor at start; for non-empty cells, place at end
+        range.collapse(nextCell.childNodes.length === 0);
         sel.removeAllRanges();
         sel.addRange(range);
       }
