@@ -424,12 +424,28 @@ function CommentViewer() {
   }, [undo, redo]);
 
   useEffect(() => {
+    // Set a timeout to handle cases where Office.js fails to load
+    const initTimeout = setTimeout(() => {
+      console.warn('Office.js initialization timeout - setting officeReady to true anyway');
+      setOfficeReady(true);
+      setLoading(false);
+    }, 5000);
+
     Office.onReady((info) => {
+      clearTimeout(initTimeout);
+      console.log('Office.js ready. Host:', info.host);
+      
       if (info.host === Office.HostType.Word) {
         setOfficeReady(true);
         loadCommentsFromWord();
+      } else {
+        console.warn('Not running in Word. Host type:', info.host);
+        setOfficeReady(true);
+        setLoading(false);
       }
     });
+
+    return () => clearTimeout(initTimeout);
   }, []);
 
   useEffect(() => {
@@ -452,8 +468,15 @@ function CommentViewer() {
   }, [comments, officeReady]);
 
   async function loadCommentsFromWord() {
+    console.log('loadCommentsFromWord called');
     setLoading(true);
     try {
+      if (typeof Word === 'undefined') {
+        console.warn('Word API not available');
+        setLoading(false);
+        return;
+      }
+
       await Word.run(async (context) => {
         const wordComments = context.document.body.getComments();
         wordComments.load("items");
@@ -502,6 +525,8 @@ function CommentViewer() {
           setHistoryIndex(0);
           setExpandedComments(new Set([commentData[0].id]));
         }
+        
+        console.log(`Loaded ${commentData.length} comments from Word`);
       });
     } catch (error) {
       console.error("Error loading comments:", error);
