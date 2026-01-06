@@ -7,7 +7,7 @@
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min. js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 
 <style>
@@ -20,7 +20,7 @@ body {
 [contenteditable] { outline: none; }
 [contenteditable]:focus { background-color: #f0f0f0; }
 
-: :-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background:  #f1f1f1; }
 ::-webkit-scrollbar-thumb { background: #6b7280; border-radius:  4px; }
 ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
@@ -29,7 +29,7 @@ body {
   from { opacity:  0; }
   to { opacity: 1; }
 }
-. fade-in { animation: fadeIn 0.2s ease-in; }
+.fade-in { animation: fadeIn 0.2s ease-in; }
 
 .save-indicator {
   transition: opacity 0.3s ease;
@@ -50,6 +50,7 @@ const CONSTANTS = {
   LOCATION_PREVIEW_LENGTH: 50,
   MAX_HISTORY_SIZE: 50,
   DEBOUNCE_DELAY: 300,
+  OFFICE_INIT_TIMEOUT: 5000,
 };
 
 // Utility:  Debounce hook
@@ -113,14 +114,14 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
   const isUpdatingRef = useRef(false);
 
   useEffect(() => {
-    if (editorRef.current && ! editorRef.current.innerHTML) {
+    if (editorRef.current && !editorRef.current.innerHTML) {
       editorRef.current.innerHTML = value || '';
     }
   }, []);
 
   useEffect(() => {
-    if (editorRef.current && ! isUpdatingRef.current && document.activeElement !== editorRef.current) {
-      const currentHtml = editorRef.current. innerHTML;
+    if (editorRef.current && !isUpdatingRef.current && document.activeElement !== editorRef.current) {
+      const currentHtml = editorRef.current.innerHTML;
       if (currentHtml !== value && value !== undefined) {
         editorRef.current.innerHTML = value || '';
       }
@@ -192,7 +193,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
       });
       
       const selection = window.getSelection();
-      if (selection. rangeCount > 0) {
+      if (selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         range.deleteContents();
         range.insertNode(processed);
@@ -279,7 +280,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         }}
         suppressContentEditableWarning
       />
-      {! value && (
+      {!value && (
         <div className="absolute top-1 left-2 text-gray-400 pointer-events-none select-none text-sm italic">
           {placeholder}
         </div>
@@ -335,7 +336,7 @@ function CommentViewer() {
       const container = range.commonAncestorContainer;
       const parent = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
       
-      if (parent && parent.style. backgroundColor === 'yellow') {
+      if (parent && parent.style.backgroundColor === 'yellow') {
         document.execCommand('hiliteColor', false, 'transparent');
       } else {
         document.execCommand('hiliteColor', false, 'yellow');
@@ -345,7 +346,7 @@ function CommentViewer() {
 
   const toggleRed = useCallback(() => {
     const selection = window.getSelection();
-    if (selection.rangeCount > 0 && ! selection.isCollapsed) {
+    if (selection.rangeCount > 0 && !selection.isCollapsed) {
       const range = selection.getRangeAt(0);
       const span = document.createElement('span');
       const fragment = range.cloneContents();
@@ -369,7 +370,7 @@ function CommentViewer() {
         const newItems = [...comment.items];
         const item = newItems[itemIndex];
         const implKey = `_${column}Implemented`;
-        newItems[itemIndex] = { ... item, [implKey]: !item[implKey] };
+        newItems[itemIndex] = { ...item, [implKey]: !item[implKey] };
         return { ...comment, items: newItems };
       }
       return comment;
@@ -412,7 +413,7 @@ function CommentViewer() {
         if (e.shiftKey) {
           e.preventDefault();
           redo();
-        } else if (! document.activeElement?.contentEditable) {
+        } else if (!document.activeElement?.contentEditable) {
           e.preventDefault();
           undo();
         }
@@ -424,12 +425,26 @@ function CommentViewer() {
   }, [undo, redo]);
 
   useEffect(() => {
+    // Set a timeout to handle cases where Office.js fails to load
+    const initTimeout = setTimeout(() => {
+      console.warn('Office.js initialization timeout - loading without Word integration');
+      setLoading(false);
+    }, CONSTANTS.OFFICE_INIT_TIMEOUT);
+
     Office.onReady((info) => {
+      clearTimeout(initTimeout);
+      console.log('Office.js ready. Host:', info.host);
+      
       if (info.host === Office.HostType.Word) {
         setOfficeReady(true);
         loadCommentsFromWord();
+      } else {
+        console.warn('Not running in Word. Host type:', info.host);
+        setLoading(false);
       }
     });
+
+    return () => clearTimeout(initTimeout);
   }, []);
 
   useEffect(() => {
@@ -440,7 +455,7 @@ function CommentViewer() {
     }
     
     setSaveStatus('idle');
-    saveTimeoutRef. current = setTimeout(() => {
+    saveTimeoutRef.current = setTimeout(() => {
       saveCommentsToWordSilent();
     }, CONSTANTS.AUTO_SAVE_DELAY);
     
@@ -452,8 +467,15 @@ function CommentViewer() {
   }, [comments, officeReady]);
 
   async function loadCommentsFromWord() {
+    console.log('loadCommentsFromWord called');
     setLoading(true);
     try {
+      if (typeof Word === 'undefined') {
+        console.warn('Word API not available');
+        setLoading(false);
+        return;
+      }
+
       await Word.run(async (context) => {
         const wordComments = context.document.body.getComments();
         wordComments.load("items");
@@ -489,7 +511,7 @@ function CommentViewer() {
             position: range.start,
             location: `Position ${range.start}`,
             timestamp: new Date().toISOString().split('T')[0],
-            items: tableData. items
+            items: tableData.items
           });
         }
 
@@ -502,6 +524,8 @@ function CommentViewer() {
           setHistoryIndex(0);
           setExpandedComments(new Set([commentData[0].id]));
         }
+        
+        console.log(`Loaded ${commentData.length} comments from Word`);
       });
     } catch (error) {
       console.error("Error loading comments:", error);
@@ -517,7 +541,7 @@ function CommentViewer() {
     setSaveStatus('saving');
     try {
       await Word.run(async (context) => {
-        const wordComments = context. document.body.getComments();
+        const wordComments = context.document.body.getComments();
         wordComments.load("items");
         await context.sync();
 
@@ -566,7 +590,7 @@ function CommentViewer() {
           return;
         }
 
-        let locationText = range.text. substring(0, CONSTANTS.LOCATION_PREVIEW_LENGTH);
+        let locationText = range.text.substring(0, CONSTANTS.LOCATION_PREVIEW_LENGTH);
         if (range.text.length > CONSTANTS.LOCATION_PREVIEW_LENGTH) {
           locationText += "...";
         }
@@ -581,7 +605,7 @@ function CommentViewer() {
   }
 
   async function finalizeCreateComment() {
-    if (!newCommentId. trim()) {
+    if (!newCommentId.trim()) {
       alert("Please enter a comment ID!");
       return;
     }
@@ -652,17 +676,17 @@ function CommentViewer() {
       });
     } catch (error) {
       console.error("Error jumping to comment:", error);
-      alert("Error navigating to comment: " + error. message);
+      alert("Error navigating to comment: " + error.message);
     }
   }
 
   const filteredComments = useMemo(() => {
-    if (! debouncedSearchQuery.trim()) return comments;
+    if (!debouncedSearchQuery.trim()) return comments;
     
-    const query = debouncedSearchQuery. toLowerCase();
+    const query = debouncedSearchQuery.toLowerCase();
     return comments.filter(comment => {
       if (comment.id.toLowerCase().includes(query)) return true;
-      if (comment. location.toLowerCase().includes(query)) return true;
+      if (comment.location.toLowerCase().includes(query)) return true;
       
       return comment.items.some(item => {
         const stripHtml = (html) => {
@@ -672,7 +696,7 @@ function CommentViewer() {
         };
         
         return (
-          item.id?. toLowerCase().includes(query) ||
+          item.id?.toLowerCase().includes(query) ||
           stripHtml(item.admin).toLowerCase().includes(query) ||
           stripHtml(item.proof).toLowerCase().includes(query) ||
           stripHtml(item.galley).toLowerCase().includes(query)
@@ -719,7 +743,7 @@ function CommentViewer() {
         if (comment.id === commentId) {
           const newItems = [...comment.items];
           newItems.splice(afterIndex + 1, 0, createEmptyItem());
-          return { ... comment, items: newItems };
+          return { ...comment, items: newItems };
         }
         return comment;
       });
@@ -730,9 +754,9 @@ function CommentViewer() {
 
   const toggleHeading = useCallback((commentId, itemIndex) => {
     setComments(prevComments => {
-      const newComments = prevComments. map(comment => {
+      const newComments = prevComments.map(comment => {
         if (comment.id === commentId) {
-          const newItems = [... comment.items];
+          const newItems = [...comment.items];
           newItems[itemIndex] = { ...newItems[itemIndex], isHeading: !newItems[itemIndex].isHeading };
           return { ...comment, items: newItems };
         }
@@ -744,7 +768,7 @@ function CommentViewer() {
   }, [saveToHistory]);
 
   const updateCell = useCallback((commentId, itemIndex, column, value) => {
-    if (! currentUsername && column !== 'id' && column !== 'isHeading' && ! column.startsWith('_') && value && value.trim()) {
+    if (!currentUsername && column !== 'id' && column !== 'isHeading' && !column.startsWith('_') && value && value.trim()) {
       pendingEditRef.current = { commentId, itemIndex, column, value };
       setShowUsernameDialog(true);
       return;
@@ -774,10 +798,10 @@ function CommentViewer() {
       setShowUsernameDialog(false);
       
       if (pendingEditRef.current) {
-        const { commentId, itemIndex, column, value } = pendingEditRef. current;
-        setComments(prevComments => prevComments. map(comment => {
+        const { commentId, itemIndex, column, value } = pendingEditRef.current;
+        setComments(prevComments => prevComments.map(comment => {
           if (comment.id === commentId) {
-            const newItems = [... comment.items];
+            const newItems = [...comment.items];
             const updatedItem = { ...newItems[itemIndex], [column]: value };
             const editorKey = `_${column}Editor`;
             updatedItem[editorKey] = username;
@@ -843,7 +867,7 @@ function CommentViewer() {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-gray-600 border-b border-gray-700 px-3 py-1. 5">
+      <div className="bg-gray-600 border-b border-gray-700 px-3 py-1.5">
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold text-white">Law Review Comments</h1>
@@ -858,11 +882,11 @@ function CommentViewer() {
               style={{ cursor: 'pointer' }}>↻ Refresh</button>
             <button onClick={undo}
               disabled={historyIndex <= 0}
-              className={`${historyIndex <= 0 ?  'bg-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-0.5 rounded text-xs font-medium transition-colors`}
+              className={`${historyIndex <= 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-0.5 rounded text-xs font-medium transition-colors`}
               title="Undo (Ctrl+Z)">⎌</button>
             <button onClick={redo}
               disabled={historyIndex >= history.length - 1}
-              className={`${historyIndex >= history.length - 1 ?  'bg-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-0.5 rounded text-xs font-medium transition-colors`}
+              className={`${historyIndex >= history.length - 1 ? 'bg-gray-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600'} text-white px-2 py-0.5 rounded text-xs font-medium transition-colors`}
               title="Redo (Ctrl+Shift+Z)">↷</button>
             <button onClick={exportComments}
               className="bg-purple-500 hover:bg-purple-600 text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"
@@ -897,7 +921,7 @@ function CommentViewer() {
         </div>
         
         {/* Search bar */}
-        <div className="mt-1. 5 flex gap-2 items-center">
+        <div className="mt-1.5 flex gap-2 items-center">
           <input 
             type="text"
             value={searchQuery}
@@ -981,7 +1005,7 @@ function CommentViewer() {
                 ref={commentIdInputRef}
                 type="text" 
                 value={newCommentId} 
-                onChange={(e) => setNewCommentId(e. target.value)}
+                onChange={(e) => setNewCommentId(e.target.value)}
                 onKeyDown={handleDialogKeyDown}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                 placeholder="125A" 
@@ -992,7 +1016,7 @@ function CommentViewer() {
               <input 
                 type="text" 
                 value={newCommentLocation} 
-                onChange={(e) => setNewCommentLocation(e. target.value)}
+                onChange={(e) => setNewCommentLocation(e.target.value)}
                 onKeyDown={handleDialogKeyDown}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent" 
               />
@@ -1029,7 +1053,7 @@ function CommentViewer() {
                 Cancel
               </button>
               <button 
-                onClick={() => deleteRow(deleteConfirm. commentId, deleteConfirm. itemIndex)}
+                onClick={() => deleteRow(deleteConfirm.commentId, deleteConfirm.itemIndex)}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium transition-colors">
                 Delete
               </button>
@@ -1040,16 +1064,26 @@ function CommentViewer() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto p-2">
-        {loading ?  (
+        {loading ? (
           <div className="text-center text-gray-500 mt-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-600 mb-2"></div>
             <p className="text-sm">Loading comments... </p>
           </div>
         ) : comments.length === 0 ? (
           <div className="text-center text-gray-500 mt-8 bg-white p-6 rounded border border-gray-200 max-w-sm mx-auto">
-            <p className="text-base mb-2">📋 No comments yet</p>
-            <p className="text-xs mb-1">Select some text and click "New Comment" to get started. </p>
-            <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
+            {!officeReady ? (
+              <>
+                <p className="text-base mb-2">⚠️ Not connected to Word</p>
+                <p className="text-xs mb-1">This add-in requires Microsoft Word to function properly.</p>
+                <p className="text-xs mt-3 text-gray-400">If you're in Word, try refreshing the add-in.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-base mb-2">📋 No comments yet</p>
+                <p className="text-xs mb-1">Select some text and click "New Comment" to get started. </p>
+                <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
+              </>
+            )}
           </div>
         ) : filteredComments.length === 0 ? (
           <div className="text-center text-gray-500 mt-8">
@@ -1087,7 +1121,7 @@ function CommentViewer() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
-                    {comment.items.length} item{comment.items.length !== 1 ? 's' :  ''}
+                    {comment.items.length} item{comment.items.length !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>
@@ -1104,7 +1138,7 @@ function CommentViewer() {
                           { key: 'proof', label: 'Proof' },
                           { key: 'galley', label: 'Galley' }
                         ].map(({ key, label }) => (
-                          ! collapsedColumns.has(key) && (
+                          !collapsedColumns.has(key) && (
                             <th key={key}
                               className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors"
                               style={{ minWidth: '250px' }} 
@@ -1136,7 +1170,7 @@ function CommentViewer() {
                               {Array.from(collapsedColumns).map(col => (
                                 <button key={col} onClick={(e) => { e.stopPropagation(); toggleColumn(col); }}
                                   className="px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1 transition-colors">
-                                  <ChevronDown /> {col. charAt(0).toUpperCase() + col.slice(1)}
+                                  <ChevronDown /> {col.charAt(0).toUpperCase() + col.slice(1)}
                                 </button>
                               ))}
                             </div>
@@ -1146,14 +1180,14 @@ function CommentViewer() {
                       </tr>
                     </thead>
                     <tbody>
-                      {comment.items. map((item, idx) => (
-                        <tr key={idx} className={item.isHeading ? 'bg-blue-50' : (idx % 2 === 0 ? 'bg-white' :  'bg-gray-50')}>
-                          <td className="px-1. 5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: '50px', width: '50px' }}>
+                      {comment.items.map((item, idx) => (
+                        <tr key={idx} className={item.isHeading ? 'bg-blue-50' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')}>
+                          <td className="px-1.5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: '50px', width: '50px' }}>
                             <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, 'id', e.target.value)}
                               className={`w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs ${item.isHeading ? 'font-bold' : ''}`}
                               placeholder="#" />
                           </td>
-                          {! collapsedColumns.has('admin') && (
+                          {!collapsedColumns.has('admin') && (
                             <td className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative ${item._adminImplemented ? 'bg-green-100' : ''}`}>
                               <button
                                 onClick={(e) => {
@@ -1166,7 +1200,7 @@ function CommentViewer() {
                               >
                                 ✓
                               </button>
-                              <div className={item. isHeading ? 'font-semibold' : ''}>
+                              <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <MemoizedRichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" />
                               </div>
@@ -1185,7 +1219,7 @@ function CommentViewer() {
                               >
                                 ✓
                               </button>
-                              <div className={item.isHeading ?  'font-semibold' : ''}>
+                              <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <MemoizedRichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" />
                               </div>
@@ -1198,13 +1232,13 @@ function CommentViewer() {
                                   e.stopPropagation();
                                   toggleCellImplemented(comment.id, idx, 'galley');
                                 }}
-                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs transition-colors ${item._galleyImplemented ?  'bg-green-600 text-white' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs transition-colors ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}
                                 style={{ zIndex: 20, cursor: 'pointer' }}
                                 title={item._galleyImplemented ? "Mark as not implemented" : "Mark as implemented"}
                               >
                                 ✓
                               </button>
-                              <div className={item. isHeading ? 'font-semibold' : ''}>
+                              <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <MemoizedRichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" />
                               </div>
