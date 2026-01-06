@@ -50,6 +50,7 @@ const CONSTANTS = {
   LOCATION_PREVIEW_LENGTH: 50,
   MAX_HISTORY_SIZE: 50,
   DEBOUNCE_DELAY: 300,
+  OFFICE_INIT_TIMEOUT: 5000,
 };
 
 // Utility:  Debounce hook
@@ -426,10 +427,9 @@ function CommentViewer() {
   useEffect(() => {
     // Set a timeout to handle cases where Office.js fails to load
     const initTimeout = setTimeout(() => {
-      console.warn('Office.js initialization timeout - setting officeReady to true anyway');
-      setOfficeReady(true);
+      console.warn('Office.js initialization timeout - loading without Word integration');
       setLoading(false);
-    }, 5000);
+    }, CONSTANTS.OFFICE_INIT_TIMEOUT);
 
     Office.onReady((info) => {
       clearTimeout(initTimeout);
@@ -440,7 +440,6 @@ function CommentViewer() {
         loadCommentsFromWord();
       } else {
         console.warn('Not running in Word. Host type:', info.host);
-        setOfficeReady(true);
         setLoading(false);
       }
     });
@@ -1072,9 +1071,19 @@ function CommentViewer() {
           </div>
         ) : comments.length === 0 ? (
           <div className="text-center text-gray-500 mt-8 bg-white p-6 rounded border border-gray-200 max-w-sm mx-auto">
-            <p className="text-base mb-2">📋 No comments yet</p>
-            <p className="text-xs mb-1">Select some text and click "New Comment" to get started. </p>
-            <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
+            {!officeReady ? (
+              <>
+                <p className="text-base mb-2">⚠️ Not connected to Word</p>
+                <p className="text-xs mb-1">This add-in requires Microsoft Word to function properly.</p>
+                <p className="text-xs mt-3 text-gray-400">If you're in Word, try refreshing the add-in.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-base mb-2">📋 No comments yet</p>
+                <p className="text-xs mb-1">Select some text and click "New Comment" to get started. </p>
+                <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
+              </>
+            )}
           </div>
         ) : filteredComments.length === 0 ? (
           <div className="text-center text-gray-500 mt-8">
