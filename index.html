@@ -42,7 +42,7 @@ body {
 console.log("Law Review Add-in Version 38 - Green cell marking!");
 
 const { useState, useEffect, useMemo, useRef } = React;
-const DOM_UPDATE_DELAY = 50;
+const DOM_UPDATE_DELAY = 100;
 
 function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column, onAddRowAfter }) {
   const editorRef = useRef(null);
@@ -198,16 +198,19 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
     if (e.key === 'Tab') {
       e.preventDefault();
       focusNextCellInColumn();
+      return;
     }
-    if (e.shiftKey && e.key === 'Enter') {
+    if (e.shiftKey && (e.key === 'Enter' || e.keyCode === 13)) {
       e.preventDefault();
+      e.stopPropagation();
       if (onAddRowAfter) {
         onAddRowAfter(commentId, itemIndex);
-        // Focus the new row's cell in the same column after a short delay to allow DOM update
+        // Focus the new row's cell in the same column after React re-renders
         setTimeout(() => {
           focusNextCellInColumn();
         }, DOM_UPDATE_DELAY);
       }
+      return;
     }
   };
 
