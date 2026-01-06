@@ -127,48 +127,71 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   const isUpdatingRef = useRef(false);
 
   // Helper function to mark non-breaking spaces
-  const markNonBreakingSpaces = (html) => {
+  const markNonBreakingSpaces = useCallback((html) => {
     if (!html) return html;
-    // Replace nbsp with marked version
-    return html.replace(/\u00A0/g, '<span class="nbsp-marker">\u00A0</span>');
-  };
+    // Replace nbsp with marked version - but avoid double-wrapping
+    return html.replace(/(?!<span class="nbsp-marker">)\u00A0(?!<\/span>)/g, '<span class="nbsp-marker">\u00A0</span>');
+  }, []);
 
   // Helper function to clean nbsp markers for saving
-  const cleanNonBreakingSpaces = (html) => {
+  const cleanNonBreakingSpaces = useCallback((html) => {
     if (!html) return html;
     // Remove the nbsp-marker spans but keep the nbsp character
     return html.replace(/<span class="nbsp-marker">(\u00A0)<\/span>/g, '\u00A0');
-  };
+  }, []);
 
   useEffect(() => {
     if (editorRef.current && !editorRef.current.innerHTML) {
       editorRef.current.innerHTML = markNonBreakingSpaces(value || "");
     }
-  }, []);
+  }, [value, markNonBreakingSpaces]);
 
   useEffect(() => {
     if (editorRef.current && !isUpdatingRef.current && document.activeElement !== editorRef.current) {
-      const currentHtml = cleanNonBreakingSpaces(editorRef.current.innerHTML);
-      if (currentHtml !== value && value !== undefined) {
+      const currentHtml = editorRef.current.innerHTML;
+      const currentClean = cleanNonBreakingSpaces(currentHtml);
+      if (currentClean !== value && value !== undefined) {
         editorRef.current.innerHTML = markNonBreakingSpaces(value || "");
       }
     }
-  }, [value]);
+  }, [value, markNonBreakingSpaces, cleanNonBreakingSpaces]);
 
   const handleInput = useCallback((e) => {
     isUpdatingRef.current = true;
     const rawHtml = e.target.innerHTML;
-    // Mark any new nbsp that might have been typed
-    const markedHtml = markNonBreakingSpaces(rawHtml);
-    if (markedHtml !== rawHtml) {
-      e.target.innerHTML = markedHtml;
-    }
-    const cleanHtml = cleanNonBreakingSpaces(e.target.innerHTML);
+    const cleanHtml = cleanNonBreakingSpaces(rawHtml);
     onChange(cleanHtml);
+    
+    // Apply marking after a short delay to allow the change to propagate
     requestAnimationFrame(() => {
+      if (editorRef.current) {
+        const markedHtml = markNonBreakingSpaces(editorRef.current.innerHTML);
+        if (markedHtml !== editorRef.current.innerHTML) {
+          // Save cursor position
+          const sel = window.getSelection();
+          const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+          const offset = range ? range.startOffset : 0;
+          const container = range ? range.startContainer : null;
+          
+          editorRef.current.innerHTML = markedHtml;
+          
+          // Restore cursor position
+          if (container && editorRef.current.contains(container)) {
+            try {
+              const newRange = document.createRange();
+              newRange.setStart(container, Math.min(offset, container.length || 0));
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+            } catch (e) {
+              // If cursor restoration fails, just continue
+            }
+          }
+        }
+      }
       isUpdatingRef.current = false;
     });
-  }, [onChange]);
+  }, [onChange, cleanNonBreakingSpaces, markNonBreakingSpaces]);
 
   const handlePaste = useCallback((e) => {
     e.preventDefault();
@@ -187,23 +210,19 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
           const tagName = node.tagName.toLowerCase();
           const style = node.style;
           const styleAttr = node.getAttribute("style") || "";
-          const computedStyle = window.getComputedStyle(node);
           
           const isBold = tagName === "b" || tagName === "strong" ||
             style.fontWeight === "bold" || style.fontWeight === "700" ||
-            styleAttr.includes("font-weight: bold") ||
-            computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700";
+            styleAttr.includes("font-weight: bold") || styleAttr.includes("font-weight:bold");
           const isItalic = tagName === "i" || tagName === "em" ||
             style.fontStyle === "italic" ||
-            styleAttr.includes("font-style: italic") ||
-            computedStyle.fontStyle === "italic";
+            styleAttr.includes("font-style: italic") || styleAttr.includes("font-style:italic");
           const isSmallcaps = style.fontVariant === "small-caps" ||
-            styleAttr.includes("font-variant: small-caps") ||
-            computedStyle.fontVariant === "small-caps";
+            styleAttr.includes("font-variant: small-caps") || styleAttr.includes("font-variant:small-caps");
 
           const children = Array.from(node.childNodes).map(processNode);
 
-          // Build the element hierarchy
+          // Build the element hierarchy - smallcaps innermost, then italic, then bold outermost
           let resultElement = null;
           
           if (isSmallcaps) {
@@ -213,25 +232,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             resultElement = span;
           }
           
-          if (isBold && isItalic) {
-            const strong = document.createElement("strong");
-            const em = document.createElement("em");
-            if (resultElement) {
-              em.appendChild(resultElement);
-            } else {
-              children.forEach((child) => em.appendChild(child));
-            }
-            strong.appendChild(em);
-            resultElement = strong;
-          } else if (isBold) {
-            const strong = document.createElement("strong");
-            if (resultElement) {
-              strong.appendChild(resultElement);
-            } else {
-              children.forEach((child) => strong.appendChild(child));
-            }
-            resultElement = strong;
-          } else if (isItalic) {
+          if (isItalic) {
             const em = document.createElement("em");
             if (resultElement) {
               em.appendChild(resultElement);
@@ -239,6 +240,16 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
               children.forEach((child) => em.appendChild(child));
             }
             resultElement = em;
+          }
+          
+          if (isBold) {
+            const strong = document.createElement("strong");
+            if (resultElement) {
+              strong.appendChild(resultElement);
+            } else {
+              children.forEach((child) => strong.appendChild(child));
+            }
+            resultElement = strong;
           }
           
           if (resultElement) {
@@ -268,16 +279,18 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         selection.addRange(range);
       }
       
-      // Mark any nbsp in the newly pasted content
+      // Mark any nbsp in the newly pasted content and trigger input event
       if (editorRef.current) {
         const currentHtml = editorRef.current.innerHTML;
         editorRef.current.innerHTML = markNonBreakingSpaces(currentHtml);
+        // Trigger input to save changes
+        editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
       }
     } else {
       const text = e.clipboardData.getData("text/plain");
       document.execCommand("insertText", false, text);
     }
-  }, []);
+  }, [markNonBreakingSpaces]);
 
   const handleCopy = useCallback((e) => {
     const selection = window.getSelection();
@@ -286,19 +299,20 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       const container = document.createElement("div");
       container.appendChild(range.cloneContents());
 
+      // Remove background styling but keep other formatting
       container.querySelectorAll('[style*="background"]').forEach((el) => {
         el.style.backgroundColor = "";
         el.style.background = "";
       });
       
-      // Clean nbsp markers from HTML but preserve the nbsp characters
+      // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
       const cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
 
       e.clipboardData.setData("text/plain", container.textContent);
       e.clipboardData.setData("text/html", cleanedHtml);
       e.preventDefault();
     }
-  }, []);
+  }, [cleanNonBreakingSpaces]);
 
   const handleKeyDown = useCallback((e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
@@ -501,13 +515,30 @@ function CommentViewer() {
     const selection = window.getSelection();
     if (selection.rangeCount > 0 && !selection.isCollapsed) {
       const range = selection.getRangeAt(0);
-      const span = document.createElement("span");
-      const fragment = range.cloneContents();
-      span.appendChild(fragment);
-
-      const hasRed = span.querySelector('[style*="color: red"]') ||
-        span.querySelector('font[color="red"]') ||
-        (span.firstElementChild && window.getComputedStyle(span.firstElementChild).color === "rgb(255, 0, 0)");
+      
+      // Check the actual selected elements in the DOM for red color
+      let hasRed = false;
+      const container = range.commonAncestorContainer;
+      
+      if (container.nodeType === Node.TEXT_NODE) {
+        const parent = container.parentElement;
+        if (parent) {
+          const computedColor = window.getComputedStyle(parent).color;
+          hasRed = computedColor === "rgb(255, 0, 0)" || parent.style.color === "red";
+        }
+      } else if (container.nodeType === Node.ELEMENT_NODE) {
+        const computedColor = window.getComputedStyle(container).color;
+        hasRed = computedColor === "rgb(255, 0, 0)" || container.style.color === "red";
+      }
+      
+      // Also check if selection spans multiple elements with red
+      const rangeContainer = document.createElement("div");
+      rangeContainer.appendChild(range.cloneContents());
+      if (!hasRed) {
+        hasRed = rangeContainer.querySelector('[style*="color: red"]') !== null ||
+                 rangeContainer.querySelector('[style*="color: rgb(255, 0, 0)"]') !== null ||
+                 rangeContainer.querySelector('font[color="red"]') !== null;
+      }
 
       if (hasRed) {
         document.execCommand("foreColor", false, "black");
