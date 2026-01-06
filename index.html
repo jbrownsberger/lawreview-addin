@@ -196,7 +196,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" style={{ paddingRight: '28px' }}>
       <div
         ref={editorRef}
         contentEditable
@@ -280,14 +280,6 @@ function CommentViewer() {
         document.execCommand('foreColor', false, 'red');
       }
     }
-  };
-
-  const applyHighlight = () => {
-    toggleHighlight();
-  };
-
-  const applyRed = () => {
-    toggleRed();
   };
 
   const toggleCellImplemented = (commentId, itemIndex, column) => {
@@ -737,12 +729,12 @@ function CommentViewer() {
           <button onClick={() => applyFormat('italic')}
             className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded italic text-white text-xs"
             title="Italic">I</button>
-          <button onClick={applyHighlight}
+          <button onClick={toggleHighlight}
             className="px-2 py-0.5 bg-yellow-400 hover:bg-yellow-500 border border-yellow-500 rounded text-gray-900 text-xs font-medium"
-            title="Highlight">H</button>
-          <button onClick={applyRed}
+            title="Toggle Highlight">H</button>
+          <button onClick={toggleRed}
             className="px-2 py-0.5 bg-red-500 hover:bg-red-600 border border-red-600 rounded text-white text-xs font-medium"
-            title="Red Text">R</button>
+            title="Toggle Red Text">R</button>
           <button onClick={() => applyFormat('removeFormat')}
             className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-red-400 text-xs"
             title="Clear">✕</button>
@@ -957,7 +949,8 @@ function CommentViewer() {
                                   e.stopPropagation();
                                   toggleCellImplemented(comment.id, idx, 'admin');
                                 }}
-                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._adminImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._adminImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
                                 title={item._adminImplemented ? "Mark as not implemented" : "Mark as implemented"}
                               >
                                 ✓
@@ -975,7 +968,8 @@ function CommentViewer() {
                                   e.stopPropagation();
                                   toggleCellImplemented(comment.id, idx, 'proof');
                                 }}
-                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._proofImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._proofImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
                                 title={item._proofImplemented ? "Mark as not implemented" : "Mark as implemented"}
                               >
                                 ✓
@@ -993,7 +987,8 @@ function CommentViewer() {
                                   e.stopPropagation();
                                   toggleCellImplemented(comment.id, idx, 'galley');
                                 }}
-                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
                                 title={item._galleyImplemented ? "Mark as not implemented" : "Mark as implemented"}
                               >
                                 ✓
