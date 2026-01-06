@@ -84,9 +84,13 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         if (nextCell.childNodes.length > 0) {
           range.selectNodeContents(nextCell);
           range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
+        } else {
+          // For empty cells, place cursor at the start of the cell
+          range.selectNodeContents(nextCell);
+          range.collapse(true);
         }
+        sel.removeAllRanges();
+        sel.addRange(range);
       }
     }
   };
