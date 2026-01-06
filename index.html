@@ -73,7 +73,8 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
   };
 
   const focusNextCellInColumn = () => {
-    const allCells = Array.from(document.querySelectorAll(`[data-cell-column="${column}"]`));
+    // Only find cells in the same comment and column
+    const allCells = Array.from(document.querySelectorAll(`[data-cell-column="${column}"][data-comment-id="${commentId}"]`));
     const currentIndex = allCells.indexOf(editorRef.current);
     if (currentIndex >= 0 && currentIndex < allCells.length - 1) {
       const nextCell = allCells[currentIndex + 1];
@@ -224,6 +225,8 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
         onCopy={handleCopy}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
+        data-comment-id={commentId}
+        data-item-index={itemIndex}
         className="w-full min-h-[1.8rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm leading-tight"
         style={{ 
           wordWrap: 'break-word', 
