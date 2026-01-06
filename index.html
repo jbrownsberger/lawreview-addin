@@ -176,7 +176,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
       document.execCommand('underline', false, null);
       return;
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       if (onToggleImplemented) {
         onToggleImplemented(commentId, itemIndex, column);
@@ -203,7 +203,7 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full" style={{ paddingRight: '28px' }}>
       <div
         ref={editorRef}
         contentEditable
@@ -965,8 +965,8 @@ function CommentViewer() {
                                   toggleCellImplemented(comment.id, idx, 'admin');
                                 }}
                                 className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._adminImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
-                                style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
-                                title={item._adminImplemented ? "Mark as not implemented (Ctrl+M)" : "Mark as implemented (Ctrl+M)"}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
+                                title={item._adminImplemented ? "Mark as not implemented (Ctrl+K)" : "Mark as implemented (Ctrl+K)"}
                               >
                                 ✓
                               </button>
@@ -985,8 +985,8 @@ function CommentViewer() {
                                   toggleCellImplemented(comment.id, idx, 'proof');
                                 }}
                                 className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._proofImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
-                                style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
-                                title={item._proofImplemented ? "Mark as not implemented (Ctrl+M)" : "Mark as implemented (Ctrl+M)"}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
+                                title={item._proofImplemented ? "Mark as not implemented (Ctrl+K)" : "Mark as implemented (Ctrl+K)"}
                               >
                                 ✓
                               </button>
@@ -1005,8 +1005,8 @@ function CommentViewer() {
                                   toggleCellImplemented(comment.id, idx, 'galley');
                                 }}
                                 className={`absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
-                                style={{ zIndex: 10, pointerEvents: 'auto', cursor: 'pointer' }}
-                                title={item._galleyImplemented ? "Mark as not implemented (Ctrl+M)" : "Mark as implemented (Ctrl+M)"}
+                                style={{ zIndex: 20, pointerEvents: 'auto', cursor: 'pointer' }}
+                                title={item._galleyImplemented ? "Mark as not implemented (Ctrl+K)" : "Mark as implemented (Ctrl+K)"}
                               >
                                 ✓
                               </button>
