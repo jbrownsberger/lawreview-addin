@@ -951,9 +951,17 @@ function CommentViewer() {
                               placeholder="#" />
                           </td>
                           {!collapsedColumns.has('admin') && (
-                            <td 
-                              className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top cursor-pointer ${item._adminImplemented ? 'bg-green-100' : ''}`}
-                              onClick={() => toggleCellImplemented(comment.id, idx, 'admin')}>
+                            <td className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative ${item._adminImplemented ? 'bg-green-100' : ''}`}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCellImplemented(comment.id, idx, 'admin');
+                                }}
+                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._adminImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                title={item._adminImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                              >
+                                ✓
+                              </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.admin} onChange={(html) => updateCell(comment.id, idx, 'admin', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="admin" />
@@ -961,9 +969,17 @@ function CommentViewer() {
                             </td>
                           )}
                           {!collapsedColumns.has('proof') && (
-                            <td 
-                              className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top cursor-pointer ${item._proofImplemented ? 'bg-green-100' : ''}`}
-                              onClick={() => toggleCellImplemented(comment.id, idx, 'proof')}>
+                            <td className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative ${item._proofImplemented ? 'bg-green-100' : ''}`}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCellImplemented(comment.id, idx, 'proof');
+                                }}
+                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._proofImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                title={item._proofImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                              >
+                                ✓
+                              </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.proof} onChange={(html) => updateCell(comment.id, idx, 'proof', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="proof" />
@@ -971,9 +987,17 @@ function CommentViewer() {
                             </td>
                           )}
                           {!collapsedColumns.has('galley') && (
-                            <td 
-                              className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top cursor-pointer ${item._galleyImplemented ? 'bg-green-100' : ''}`}
-                              onClick={() => toggleCellImplemented(comment.id, idx, 'galley')}>
+                            <td className={`px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative ${item._galleyImplemented ? 'bg-green-100' : ''}`}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCellImplemented(comment.id, idx, 'galley');
+                                }}
+                                className={`absolute top-0.5 right-0.5 w-4 h-4 flex items-center justify-center rounded text-xs ${item._galleyImplemented ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-400 hover:bg-gray-300'}`}
+                                title={item._galleyImplemented ? "Mark as not implemented" : "Mark as implemented"}
+                              >
+                                ✓
+                              </button>
                               <div className={item.isHeading ? 'font-semibold' : ''}>
                                 <RichTextCell value={item.galley} onChange={(html) => updateCell(comment.id, idx, 'galley', html)} 
                                   placeholder="—" commentId={comment.id} itemIndex={idx} column="galley" />
