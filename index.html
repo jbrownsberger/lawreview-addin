@@ -46,6 +46,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, column, onAddRowAfter }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
+  const DOM_UPDATE_DELAY = 50;
 
   useEffect(() => {
     if (editorRef.current && !editorRef.current.innerHTML) {
@@ -204,7 +205,6 @@ function RichTextCell({ value, onChange, placeholder, commentId, itemIndex, colu
       if (onAddRowAfter) {
         onAddRowAfter(commentId, itemIndex);
         // Focus the new row's cell in the same column after a short delay to allow DOM update
-        const DOM_UPDATE_DELAY = 50;
         setTimeout(() => {
           focusNextCellInColumn();
         }, DOM_UPDATE_DELAY);
