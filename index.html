@@ -148,33 +148,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     return html.replace(/<span class="nbsp-marker">(\u00A0)<\/span>/g, '\u00A0');
   }, []);
 
-  // Pre-compiled regex patterns for cleaning browser-inserted nbsp
-  // Note: nbsp before opening tags and after closing tags are converted to regular spaces
-  // to maintain word spacing, while nbsp inside formatted text are removed entirely
-  const nbspCleanupPatterns = useMemo(() => {
-    const tags = 'strong|b|em|i|u|span|font';
-    return [
-      // Remove nbsp immediately before opening tag: \u00A0<tag> → <tag> (converts to regular space)
-      { pattern: new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), replacement: ' $1' },
-      // Remove nbsp immediately after opening tag: <tag>\u00A0 → <tag>
-      { pattern: new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), replacement: '$1' },
-      // Remove nbsp immediately before closing tag: \u00A0</tag> → </tag>
-      { pattern: new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), replacement: '$1' },
-      // Remove nbsp immediately after closing tag: </tag>\u00A0 → </tag> (converts to regular space)
-      { pattern: new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), replacement: '$1 ' }
-    ];
-  }, []);
-
-  // Helper function to remove browser-inserted nbsp adjacent to formatting tags
-  const cleanBrowserInsertedNbsp = useCallback((html) => {
-    if (!html) return html;
-    // Apply all cleanup patterns using reduce for optimal performance
-    return nbspCleanupPatterns.reduce(
-      (result, { pattern, replacement }) => result.replace(pattern, replacement),
-      html
-    );
-  }, [nbspCleanupPatterns]);
-
   useEffect(() => {
     if (editorRef.current && !editorRef.current.innerHTML) {
       editorRef.current.innerHTML = markNonBreakingSpaces(value || "");
@@ -194,9 +167,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   const handleInput = useCallback((e) => {
     isUpdatingRef.current = true;
     let rawHtml = e.target.innerHTML;
-    
-    // Clean browser-inserted nbsp around formatting tags
-    rawHtml = cleanBrowserInsertedNbsp(rawHtml);
     
     const cleanHtml = cleanNonBreakingSpaces(rawHtml);
     onChange(cleanHtml);
@@ -230,7 +200,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       }
       isUpdatingRef.current = false;
     });
-  }, [onChange, cleanNonBreakingSpaces, markNonBreakingSpaces, cleanBrowserInsertedNbsp]);
+  }, [onChange, cleanNonBreakingSpaces, markNonBreakingSpaces]);
 
   const handlePaste = useCallback((e) => {
     e.preventDefault();
@@ -332,7 +302,19 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       });
       
       // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
-      const cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
+      let cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
+      
+      // Replace nbsp around formatting tags with regular spaces
+      // Target formatting tags: strong, b, em, i, u, span, font
+      const tags = 'strong|b|em|i|u|span|font';
+      // Before opening tag: \u00A0<tag> → <tag> (replace with regular space)
+      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
+      // After opening tag: <tag>\u00A0 → <tag> (remove)
+      cleanedHtml = cleanedHtml.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
+      // Before closing tag: \u00A0</tag> → </tag> (remove)
+      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
+      // After closing tag: </tag>\u00A0 → </tag> (replace with regular space)
+      cleanedHtml = cleanedHtml.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
       
       // Wrap content with Georgia 12pt font for consistent pasting
       const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + cleanedHtml + '</span>';
@@ -343,37 +325,20 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     }
   }, [cleanNonBreakingSpaces]);
 
-  // Helper to clean nbsp after execCommand
-  const cleanAfterExecCommand = useCallback(() => {
-    requestAnimationFrame(() => {
-      if (editorRef.current) {
-        const cleanedHtml = cleanBrowserInsertedNbsp(editorRef.current.innerHTML);
-        if (cleanedHtml !== editorRef.current.innerHTML) {
-          editorRef.current.innerHTML = cleanedHtml;
-          // Trigger input event to save changes
-          editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      }
-    });
-  }, [cleanBrowserInsertedNbsp]);
-
   const handleKeyDown = useCallback((e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
       document.execCommand("bold", false, null);
-      cleanAfterExecCommand();
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "i") {
       e.preventDefault();
       document.execCommand("italic", false, null);
-      cleanAfterExecCommand();
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "u") {
       e.preventDefault();
       document.execCommand("underline", false, null);
-      cleanAfterExecCommand();
       return;
     }
 
@@ -421,7 +386,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         }
       }
     }
-  }, [column, addRowAfter, commentId, itemIndex, cleanAfterExecCommand]);
+  }, [column, addRowAfter, commentId, itemIndex]);
 
   return (
     <div className="relative w-full" style={{ paddingRight: "20px" }}>
