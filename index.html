@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v42</title>
+<title>Law Review Comment Viewer - v43</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -53,7 +53,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 42 - Fixed Enter key in dialog, improved smallcaps detection");
+console.log("Law Review Add-in Version 43 - Compact layout with Notre Dame color palette");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -110,10 +110,10 @@ function ChevronUp() {
 // Save status indicator
 function SaveIndicator({ status }) {
   if (status === "saving") {
-    return <span className="save-indicator text-xs text-yellow-300 opacity-100">Saving...</span>;
+    return <span className="save-indicator text-xs text-[#C99700] opacity-100">Saving...</span>;
   }
   if (status === "saved") {
-    return <span className="save-indicator text-xs text-green-300 opacity-100">Saved ✓</span>;
+    return <span className="save-indicator text-xs text-[#4ADE80] opacity-100">Saved ✓</span>;
   }
   if (status === "error") {
     return <span className="save-indicator text-xs text-red-300 opacity-100">Save failed</span>;
@@ -427,7 +427,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   }, [column, addRowAfter, commentId, itemIndex]);
 
   return (
-    <div className="relative w-full" style={{ paddingRight: "28px" }}>
+    <div className="relative w-full" style={{ paddingRight: "20px" }}>
       <div
         ref={editorRef}
         contentEditable
@@ -436,7 +436,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         onCopy={handleCopy}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
-        className="w-full min-h-[1.8rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-2 py-1 cursor-text text-sm leading-tight"
+        className="w-full min-h-[1.4rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-1 py-0.5 cursor-text text-sm leading-tight"
         style={{
           wordWrap: "break-word",
           whiteSpace: "pre-wrap",
@@ -445,7 +445,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         suppressContentEditableWarning
       />
       {!value && (
-        <div className="absolute top-1 left-2 text-gray-400 pointer-events-none select-none text-sm italic">
+        <div className="absolute top-0.5 left-1 text-gray-400 pointer-events-none select-none text-sm italic">
           {placeholder}
         </div>
       )}
@@ -1095,7 +1095,7 @@ function CommentViewer() {
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-gray-600 border-b border-gray-700 px-3 py-1.5">
+      <div className="bg-[#0C2340] border-b border-[#1E3A5F] px-3 py-1.5">
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold text-white">Law Review Comments</h1>
@@ -1104,20 +1104,20 @@ function CommentViewer() {
           <div className="flex gap-1">
             <button
               onClick={createNewCommentFromSelection}
-              className="bg-green-600 hover:bg-green-700 text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
+              className="bg-[#C99700] hover:bg-[#B8860B] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
             >
               + New
             </button>
             <button
               onClick={loadCommentsFromWord}
-              className="bg-sky-500 hover:bg-sky-600 text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
+              className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
             >
               ↻ Refresh
             </button>
             <button
               onClick={undo}
               disabled={historyIndex <= 0}
-              className={(historyIndex <= 0 ? "bg-gray-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
+              className={(historyIndex <= 0 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
               title="Undo (Ctrl+Z)"
             >
               ⎌
@@ -1125,14 +1125,14 @@ function CommentViewer() {
             <button
               onClick={redo}
               disabled={historyIndex >= history.length - 1}
-              className={(historyIndex >= history.length - 1 ? "bg-gray-400 cursor-not-allowed" : "bg-amber-500 hover:bg-amber-600 cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
+              className={(historyIndex >= history.length - 1 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
               title="Redo (Ctrl+Shift+Z)"
             >
               ↷
             </button>
             <button
               onClick={exportComments}
-              className="bg-purple-500 hover:bg-purple-600 text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
+              className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
               title="Export to JSON"
             >
               ↓
@@ -1144,21 +1144,21 @@ function CommentViewer() {
         <div className="flex gap-1 flex-wrap">
           <button
             onClick={() => applyFormat("bold")}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded font-bold text-white text-xs transition-colors"
+            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded font-bold text-white text-xs transition-colors"
             title="Bold (Ctrl+B)"
           >
             B
           </button>
           <button
             onClick={() => applyFormat("italic")}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded italic text-white text-xs transition-colors"
+            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded italic text-white text-xs transition-colors"
             title="Italic (Ctrl+I)"
           >
             I
           </button>
           <button
             onClick={toggleHighlight}
-            className="px-2 py-0.5 bg-yellow-400 hover:bg-yellow-500 border border-yellow-500 rounded text-gray-900 text-xs font-medium transition-colors"
+            className="px-2 py-0.5 bg-[#C99700] hover:bg-[#B8860B] border border-[#B8860B] rounded text-white text-xs font-medium transition-colors"
             title="Toggle Highlight"
           >
             H
@@ -1172,14 +1172,14 @@ function CommentViewer() {
           </button>
           <button
             onClick={toggleSmallcaps}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-white text-xs font-medium transition-colors"
+            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs font-medium transition-colors"
             title="Toggle Smallcaps (Ctrl+Shift+K)"
           >
             Sc
           </button>
           <button
             onClick={() => applyFormat("removeFormat")}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-red-400 text-xs transition-colors"
+            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-red-400 text-xs transition-colors"
             title="Clear Formatting"
           >
             ✕
@@ -1187,14 +1187,14 @@ function CommentViewer() {
           <div className="border-l border-gray-500 mx-1"></div>
           <button
             onClick={expandAll}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-white text-xs transition-colors"
+            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs transition-colors"
             title="Expand All"
           >
             ⊞
           </button>
           <button
             onClick={collapseAll}
-            className="px-2 py-0.5 bg-gray-700 hover:bg-gray-800 border border-gray-600 rounded text-white text-xs transition-colors"
+            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs transition-colors"
             title="Collapse All"
           >
             ⊟
@@ -1274,7 +1274,7 @@ function CommentViewer() {
               </button>
               <button
                 onClick={confirmUsername}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-[#C99700] text-white rounded hover:bg-[#B8860B] text-sm font-medium transition-colors"
               >
                 Confirm
               </button>
@@ -1328,7 +1328,7 @@ function CommentViewer() {
               </button>
               <button
                 onClick={finalizeCreateComment}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium transition-colors"
+                className="px-4 py-2 bg-[#C99700] text-white rounded hover:bg-[#B8860B] text-sm font-medium transition-colors"
               >
                 Create Comment
               </button>
@@ -1389,18 +1389,18 @@ function CommentViewer() {
             <div
               key={comment.id}
               id={"comment-" + comment.id}
-              className="mb-2 bg-white rounded border border-gray-200 shadow-sm"
+              className={"mb-2 bg-white rounded border border-gray-200 shadow-sm" + (expandedComments.has(comment.id) ? " border-l-4 border-[#C99700]" : "")}
             >
               {/* Comment Header */}
-              <div className="px-2 py-1 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-2">
+              <div className="px-1.5 py-0.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-1.5">
                 <div
-                  className="flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
+                  className="flex items-center gap-1.5 flex-1 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
                   onClick={() => toggleExpand(comment.id)}
                 >
                   {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
                   <div className="text-xs">
                     <span
-                      className="font-semibold text-gray-700 cursor-pointer hover:underline hover:text-sky-600"
+                      className="font-semibold text-gray-700 cursor-pointer hover:underline hover:text-[#C99700]"
                       onClick={(e) => {
                         e.stopPropagation();
                         jumpToComment(comment.id);
@@ -1408,14 +1408,10 @@ function CommentViewer() {
                     >
                       {comment.id}
                     </span>
+                    <span className="mx-1 text-gray-400">({comment.items.length})</span>
                     <span className="mx-1 text-gray-400">•</span>
                     <span className="text-gray-600">{comment.location}</span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
-                    {comment.items.length} item{comment.items.length !== 1 ? "s" : ""}
-                  </span>
                 </div>
               </div>
 
@@ -1425,12 +1421,12 @@ function CommentViewer() {
                   <table className="w-full border-collapse text-xs">
                     <thead className="bg-gray-100 border-b border-gray-300">
                       <tr>
-                        <th className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-200" style={{ minWidth: "50px", width: "50px" }}>#</th>
+                        <th className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r border-gray-200" style={{ minWidth: "40px", width: "40px" }}>#</th>
                         {columns.map((col) => (
                           !collapsedColumns.has(col.key) ? (
                             <th
                               key={col.key}
-                              className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors"
+                              className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors"
                               style={{ minWidth: "250px" }}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1476,9 +1472,11 @@ function CommentViewer() {
                       </tr>
                     </thead>
                     <tbody>
-                      {comment.items.map((item, idx) => (
-                        <tr key={idx} className={item.isHeading ? "bg-blue-50" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50")}>
-                          <td className="px-1.5 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "50px", width: "50px" }}>
+                      {comment.items.map((item, idx) => {
+                        const rowBgClass = item.isHeading ? "bg-[#FEF9C3]" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50");
+                        return (
+                        <tr key={idx} className={`group ${rowBgClass} hover:bg-[#E8EEF4] transition-colors`}>
+                          <td className="px-1 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "40px", width: "40px" }}>
                             <input
                               type="text"
                               value={item.id}
@@ -1491,14 +1489,14 @@ function CommentViewer() {
                             !collapsedColumns.has(col.key) ? (
                               <td
                                 key={col.key}
-                                className={"px-1.5 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-green-100" : "")}
+                                className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}
                               >
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     toggleCellImplemented(comment.id, idx, col.key);
                                   }}
-                                  className={"absolute top-0 right-0 w-6 h-6 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-green-600 text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")}
+                                  className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")}
                                   style={{ zIndex: 20, cursor: "pointer" }}
                                   title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}
                                 >
@@ -1520,24 +1518,24 @@ function CommentViewer() {
                           ))}
                           {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
                           <td className="px-1 py-0 align-top">
-                            <div className="flex flex-col gap-0.5 py-1">
+                            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col gap-0 py-0.5">
                               <button
                                 onClick={() => addRowAfter(comment.id, idx)}
-                                className="w-6 h-5 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors"
+                                className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors"
                                 title="Add row below"
                               >
                                 +
                               </button>
                               <button
                                 onClick={() => toggleHeading(comment.id, idx)}
-                                className={"w-6 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-blue-500 text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")}
+                                className={"w-5 h-4 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-[#C99700] text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")}
                                 title="Toggle heading"
                               >
                                 H
                               </button>
                               <button
                                 onClick={() => setDeleteConfirm({ commentId: comment.id, itemIndex: idx })}
-                                className="w-6 h-5 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors"
+                                className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors"
                                 title="Delete row"
                               >
                                 ×
@@ -1545,7 +1543,8 @@ function CommentViewer() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1556,9 +1555,9 @@ function CommentViewer() {
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-100 border-t border-gray-200 px-3 py-1 text-xs text-gray-500 flex justify-between">
+      <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v42</span>
+        <span>v43</span>
       </div>
     </div>
   );
