@@ -137,14 +137,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   // Helper function to mark non-breaking spaces
   const markNonBreakingSpaces = useCallback((html) => {
     if (!html) return html;
-    
-    // First, clean any nbsp adjacent to formatting tags (browser-inserted)
-    html = html.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1')
-      .replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ')
-      .replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1')
-      .replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
-    
-    // Then mark remaining nbsp (deliberately typed ones)
     // Replace nbsp with marked version - but avoid double-wrapping
     return html.replace(/(?!<span class="nbsp-marker">)\u00A0(?!<\/span>)/g, '<span class="nbsp-marker">\u00A0</span>');
   }, []);
@@ -174,16 +166,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
   const handleInput = useCallback((e) => {
     isUpdatingRef.current = true;
-    let rawHtml = e.target.innerHTML;
-    
-    // First, clean up any nbsp that browsers insert around formatting tags
-    // This happens when using bold, italic, etc. commands
-    rawHtml = rawHtml.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1')
-      .replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ')
-      .replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1')
-      .replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
-    
-    // Then clean nbsp markers
+    const rawHtml = e.target.innerHTML;
     const cleanHtml = cleanNonBreakingSpaces(rawHtml);
     onChange(cleanHtml);
     
@@ -318,20 +301,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       });
       
       // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
-      let cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
-      
-      // Strip nonbreaking spaces ONLY around formatted text boundaries (browser-inserted)
-      // These are the "sticky" spaces that browsers add during formatting operations
-      // Deliberately typed nonbreaking spaces (not adjacent to tags) are preserved
-      
-      // Remove nbsp immediately before opening tags
-      cleanedHtml = cleanedHtml.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1');
-      // Remove nbsp immediately after opening tags
-      cleanedHtml = cleanedHtml.replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ');
-      // Remove nbsp immediately before closing tags
-      cleanedHtml = cleanedHtml.replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1');
-      // Remove nbsp immediately after closing tags
-      cleanedHtml = cleanedHtml.replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
+      const cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
       
       // Wrap content with Georgia 12pt font for consistent pasting
       const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + cleanedHtml + '</span>';
@@ -342,15 +312,46 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     }
   }, [cleanNonBreakingSpaces]);
 
+  // Custom formatting function that doesn't use execCommand
+  // This prevents browsers from inserting unwanted nbsp around formatting tags
+  const applyCustomFormat = useCallback((tagName) => {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) return;
+    
+    // Extract the selected content
+    const selectedContent = range.extractContents();
+    
+    // Create the formatting tag
+    const formatTag = document.createElement(tagName);
+    formatTag.appendChild(selectedContent);
+    
+    // Insert the formatted content
+    range.insertNode(formatTag);
+    
+    // Restore selection around the formatted content
+    const newRange = document.createRange();
+    newRange.selectNodeContents(formatTag);
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+    
+    // Trigger input event to save changes
+    if (editorRef.current) {
+      editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }, []);
+
   const handleKeyDown = useCallback((e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
-      document.execCommand("bold", false, null);
+      applyCustomFormat('strong');
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "i") {
       e.preventDefault();
-      document.execCommand("italic", false, null);
+      applyCustomFormat('em');
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "u") {
@@ -477,7 +478,34 @@ function CommentViewer() {
   }, [currentUsername]);
 
   const applyFormat = useCallback((command) => {
-    document.execCommand(command, false, null);
+    if (command === 'bold' || command === 'italic') {
+      // Use custom formatting for bold and italic to avoid browser-inserted nbsp
+      const selection = window.getSelection();
+      if (!selection.rangeCount) return;
+      
+      const range = selection.getRangeAt(0);
+      if (range.collapsed) return;
+      
+      // Extract the selected content
+      const selectedContent = range.extractContents();
+      
+      // Create the formatting tag
+      const tagName = command === 'bold' ? 'strong' : 'em';
+      const formatTag = document.createElement(tagName);
+      formatTag.appendChild(selectedContent);
+      
+      // Insert the formatted content
+      range.insertNode(formatTag);
+      
+      // Restore selection around the formatted content
+      const newRange = document.createRange();
+      newRange.selectNodeContents(formatTag);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+    } else {
+      // Use execCommand for other formatting
+      document.execCommand(command, false, null);
+    }
   }, []);
 
   const toggleHighlight = useCallback(() => {
