@@ -303,7 +303,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       
       // First, protect user-inserted nbsp by temporarily replacing nbsp-marker spans
       // This allows us to clean browser-inserted nbsp while preserving user-inserted ones
-      const markerPlaceholder = '___NBSP_MARKER___';
+      const markerPlaceholder = '\uFFFD\uFFFE\uFFFD'; // Use Unicode replacement characters (very unlikely in user content)
       let cleanedHtml = container.innerHTML.replace(/<span class="nbsp-marker">\u00A0<\/span>/g, markerPlaceholder);
       
       // Clean browser-inserted nbsp around formatting tags (all remaining nbsp are browser-inserted)
