@@ -169,8 +169,10 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   const cleanBrowserInsertedNbsp = useCallback((html) => {
     if (!html) return html;
     // Apply all cleanup patterns using reduce for optimal performance
-    return nbspCleanupPatterns.reduce((result, { pattern, replacement }) => 
-      result.replace(pattern, replacement), html);
+    return nbspCleanupPatterns.reduce(
+      (result, { pattern, replacement }) => result.replace(pattern, replacement),
+      html
+    );
   }, [nbspCleanupPatterns]);
 
   useEffect(() => {
