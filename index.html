@@ -218,14 +218,11 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             style.fontStyle === "italic" ||
             styleAttr.includes("font-style: italic") || styleAttr.includes("font-style:italic");
           // Check for small caps in multiple formats that Word might use
-          const isSmallcaps = style.fontVariant === "small-caps" ||
-            style.fontVariant === "small-caps;" ||
+          const isSmallcaps = (style.fontVariant && style.fontVariant.includes("small-caps")) ||
             styleAttr.includes("font-variant: small-caps") || 
             styleAttr.includes("font-variant:small-caps") ||
             styleAttr.includes("mso-font-variant: small-caps") ||
-            styleAttr.includes("mso-ansi-font-variant: small-caps") ||
-            // Check for computed style as well
-            (window.getComputedStyle && window.getComputedStyle(node).fontVariant === "small-caps");
+            styleAttr.includes("mso-ansi-font-variant: small-caps");
 
           const children = Array.from(node.childNodes).map(processNode);
 
