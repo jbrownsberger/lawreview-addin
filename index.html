@@ -158,7 +158,16 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
   const handleInput = useCallback((e) => {
     isUpdatingRef.current = true;
-    const rawHtml = e.target.innerHTML;
+    let rawHtml = e.target.innerHTML;
+    
+    // First, clean up any nbsp that browsers insert around formatting tags
+    // This happens when using bold, italic, etc. commands
+    rawHtml = rawHtml.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1')
+      .replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ')
+      .replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1')
+      .replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
+    
+    // Then clean nbsp markers
     const cleanHtml = cleanNonBreakingSpaces(rawHtml);
     onChange(cleanHtml);
     
