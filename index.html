@@ -53,7 +53,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 42 - Improved smallcaps copy/paste with Word");
+console.log("Law Review Add-in Version 42 - Fixed Enter key in dialog, improved smallcaps detection");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -217,9 +217,12 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
           const isItalic = tagName === "i" || tagName === "em" ||
             style.fontStyle === "italic" ||
             styleAttr.includes("font-style: italic") || styleAttr.includes("font-style:italic");
-          const isSmallcaps = style.fontVariant === "small-caps" ||
-            styleAttr.includes("font-variant: small-caps") || styleAttr.includes("font-variant:small-caps") ||
-            styleAttr.includes("mso-font-variant: small-caps") || styleAttr.includes("mso-font-variant:small-caps");
+          // Check for small caps in multiple formats that Word might use
+          const isSmallcaps = (style.fontVariant && style.fontVariant.includes("small-caps")) ||
+            styleAttr.includes("font-variant: small-caps") || 
+            styleAttr.includes("font-variant:small-caps") ||
+            styleAttr.includes("mso-font-variant: small-caps") ||
+            styleAttr.includes("mso-ansi-font-variant: small-caps");
 
           const children = Array.from(node.childNodes).map(processNode);
 
@@ -304,14 +307,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       container.querySelectorAll('[style*="background"]').forEach((el) => {
         el.style.backgroundColor = "";
         el.style.background = "";
-      });
-      
-      // Ensure all smallcaps elements have explicit font-variant inline style for Word compatibility
-      container.querySelectorAll('[style*="font-variant"]').forEach((el) => {
-        const fontVariant = el.style.fontVariant;
-        if (fontVariant && (fontVariant === "small-caps" || fontVariant.includes("small-caps"))) {
-          el.style.fontVariant = "small-caps";
-        }
       });
       
       // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
@@ -1062,7 +1057,7 @@ function CommentViewer() {
     setDeleteConfirm(null);
   }, [saveToHistory]);
 
-  const handleDialogKeyDown = useCallback((e) => {
+  const handleDialogKeyDown = (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       finalizeCreateComment();
@@ -1071,7 +1066,7 @@ function CommentViewer() {
       setNewCommentId("");
       setNewCommentLocation("");
     }
-  }, []);
+  };
 
   useEffect(() => {
     if (showCreateDialog && commentIdInputRef.current) {
