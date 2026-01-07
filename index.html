@@ -304,17 +304,9 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
       let cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
       
-      // Replace nbsp around formatting tags with regular spaces
-      // Target formatting tags: strong, b, em, i, u, font (excluding span since it's used for nbsp-marker)
-      const tags = 'strong|b|em|i|u|font';
-      // Before opening tag: \u00A0<tag> → <tag> (replace with regular space)
-      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
-      // After opening tag: <tag>\u00A0 → <tag> (remove)
-      cleanedHtml = cleanedHtml.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
-      // Before closing tag: \u00A0</tag> → </tag> (remove)
-      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
-      // After closing tag: </tag>\u00A0 → </tag> (replace with regular space)
-      cleanedHtml = cleanedHtml.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
+      // Replace ALL nbsp with regular spaces when copying
+      // This prevents any "rogue nbsp" from appearing in pasted content
+      cleanedHtml = cleanedHtml.replace(/\u00A0/g, ' ');
       
       // Wrap content with Georgia 12pt font for consistent pasting
       const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + cleanedHtml + '</span>';
