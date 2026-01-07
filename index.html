@@ -304,8 +304,8 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
       let cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
       
-      // Replace ALL nbsp with regular spaces when copying
-      // This prevents any "rogue nbsp" from appearing in pasted content
+      // Replace ALL nbsp with regular spaces when copying to prevent "rogue nbsp" in pasted content
+      // Note: This also converts user-inserted nbsp (like "M. Smith"), but ensures no unwanted nbsp appear
       cleanedHtml = cleanedHtml.replace(/\u00A0/g, ' ');
       
       // Wrap content with Georgia 12pt font for consistent pasting
