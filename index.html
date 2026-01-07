@@ -148,26 +148,30 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     return html.replace(/<span class="nbsp-marker">(\u00A0)<\/span>/g, '\u00A0');
   }, []);
 
+  // Pre-compiled regex patterns for cleaning browser-inserted nbsp
+  const nbspCleanupPatterns = useMemo(() => {
+    const tags = 'strong|b|em|i|u|span|font';
+    return [
+      // Remove nbsp immediately before opening tag: \u00A0<tag> → <tag>
+      { pattern: new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), replacement: ' $1' },
+      // Remove nbsp immediately after opening tag: <tag>\u00A0 → <tag>
+      { pattern: new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), replacement: '$1' },
+      // Remove nbsp immediately before closing tag: \u00A0</tag> → </tag>
+      { pattern: new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), replacement: '$1' },
+      // Remove nbsp immediately after closing tag: </tag>\u00A0 → </tag>
+      { pattern: new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), replacement: '$1 ' }
+    ];
+  }, []);
+
   // Helper function to remove browser-inserted nbsp adjacent to formatting tags
   const cleanBrowserInsertedNbsp = useCallback((html) => {
     if (!html) return html;
-    // Target formatting tags: strong, b, em, i, u, span, font
-    const tags = 'strong|b|em|i|u|span|font';
-    
-    // Remove nbsp immediately before opening tag: \u00A0<tag> → <tag>
-    html = html.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
-    
-    // Remove nbsp immediately after opening tag: <tag>\u00A0 → <tag>
-    html = html.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
-    
-    // Remove nbsp immediately before closing tag: \u00A0</tag> → </tag>
-    html = html.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
-    
-    // Remove nbsp immediately after closing tag: </tag>\u00A0 → </tag>
-    html = html.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
-    
+    // Apply all cleanup patterns
+    nbspCleanupPatterns.forEach(({ pattern, replacement }) => {
+      html = html.replace(pattern, replacement);
+    });
     return html;
-  }, []);
+  }, [nbspCleanupPatterns]);
 
   useEffect(() => {
     if (editorRef.current && !editorRef.current.innerHTML) {
@@ -337,53 +341,37 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     }
   }, [cleanNonBreakingSpaces]);
 
+  // Helper to clean nbsp after execCommand
+  const cleanAfterExecCommand = useCallback(() => {
+    requestAnimationFrame(() => {
+      if (editorRef.current) {
+        const cleanedHtml = cleanBrowserInsertedNbsp(editorRef.current.innerHTML);
+        if (cleanedHtml !== editorRef.current.innerHTML) {
+          editorRef.current.innerHTML = cleanedHtml;
+          // Trigger input event to save changes
+          editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    });
+  }, [cleanBrowserInsertedNbsp]);
+
   const handleKeyDown = useCallback((e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
       document.execCommand("bold", false, null);
-      // Clean nbsp after browser finishes DOM manipulation
-      requestAnimationFrame(() => {
-        if (editorRef.current) {
-          const cleanedHtml = cleanBrowserInsertedNbsp(editorRef.current.innerHTML);
-          if (cleanedHtml !== editorRef.current.innerHTML) {
-            editorRef.current.innerHTML = cleanedHtml;
-            // Trigger input event to save changes
-            editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        }
-      });
+      cleanAfterExecCommand();
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "i") {
       e.preventDefault();
       document.execCommand("italic", false, null);
-      // Clean nbsp after browser finishes DOM manipulation
-      requestAnimationFrame(() => {
-        if (editorRef.current) {
-          const cleanedHtml = cleanBrowserInsertedNbsp(editorRef.current.innerHTML);
-          if (cleanedHtml !== editorRef.current.innerHTML) {
-            editorRef.current.innerHTML = cleanedHtml;
-            // Trigger input event to save changes
-            editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        }
-      });
+      cleanAfterExecCommand();
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "u") {
       e.preventDefault();
       document.execCommand("underline", false, null);
-      // Clean nbsp after browser finishes DOM manipulation
-      requestAnimationFrame(() => {
-        if (editorRef.current) {
-          const cleanedHtml = cleanBrowserInsertedNbsp(editorRef.current.innerHTML);
-          if (cleanedHtml !== editorRef.current.innerHTML) {
-            editorRef.current.innerHTML = cleanedHtml;
-            // Trigger input event to save changes
-            editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-        }
-      });
+      cleanAfterExecCommand();
       return;
     }
 
@@ -431,7 +419,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         }
       }
     }
-  }, [column, addRowAfter, commentId, itemIndex, cleanBrowserInsertedNbsp]);
+  }, [column, addRowAfter, commentId, itemIndex, cleanAfterExecCommand]);
 
   return (
     <div className="relative w-full" style={{ paddingRight: "20px" }}>
