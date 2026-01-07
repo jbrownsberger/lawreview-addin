@@ -217,32 +217,15 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
           const isItalic = tagName === "i" || tagName === "em" ||
             style.fontStyle === "italic" ||
             styleAttr.includes("font-style: italic") || styleAttr.includes("font-style:italic");
-          // Check for small caps in multiple formats that Word might use
-          const isSmallcaps = (style.fontVariant && style.fontVariant.includes("small-caps")) ||
-            styleAttr.includes("font-variant: small-caps") || 
-            styleAttr.includes("font-variant:small-caps") ||
-            styleAttr.includes("mso-font-variant: small-caps") ||
-            styleAttr.includes("mso-ansi-font-variant: small-caps");
 
           const children = Array.from(node.childNodes).map(processNode);
 
-          // Build the element hierarchy - smallcaps innermost, then italic, then bold outermost
+          // Build the element hierarchy - italic, then bold outermost
           let resultElement = null;
-          
-          if (isSmallcaps) {
-            const span = document.createElement("span");
-            span.style.fontVariant = "small-caps";
-            children.forEach((child) => span.appendChild(child));
-            resultElement = span;
-          }
           
           if (isItalic) {
             const em = document.createElement("em");
-            if (resultElement) {
-              em.appendChild(resultElement);
-            } else {
-              children.forEach((child) => em.appendChild(child));
-            }
+            children.forEach((child) => em.appendChild(child));
             resultElement = em;
           }
           
@@ -334,52 +317,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       document.execCommand("underline", false, null);
       return;
     }
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "K") {
-      e.preventDefault();
-      // Trigger smallcaps toggle
-      const selection = window.getSelection();
-      if (selection.rangeCount > 0 && !selection.isCollapsed) {
-        const range = selection.getRangeAt(0);
-        const container = range.commonAncestorContainer;
-        const parent = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
-        
-        let hasSmallcaps = false;
-        if (parent) {
-          const style = window.getComputedStyle(parent);
-          hasSmallcaps = style.fontVariant === "small-caps" || 
-                        parent.style.fontVariant === "small-caps";
-        }
-        
-        if (hasSmallcaps) {
-          if (parent.tagName === "SPAN" && parent.style.fontVariant === "small-caps") {
-            const textContent = parent.textContent;
-            const textNode = document.createTextNode(textContent);
-            parent.parentNode.replaceChild(textNode, parent);
-            
-            const newRange = document.createRange();
-            newRange.selectNodeContents(textNode);
-            selection.removeAllRanges();
-            selection.addRange(newRange);
-          }
-        } else {
-          const span = document.createElement("span");
-          span.style.fontVariant = "small-caps";
-          
-          try {
-            range.surroundContents(span);
-          } catch (error) {
-            const contents = range.extractContents();
-            span.appendChild(contents);
-            range.insertNode(span);
-          }
-          
-          range.collapse(false);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
-      }
-      return;
-    }
+
     if (e.shiftKey && e.key === "Enter") {
       e.preventDefault();
       // Add a new row and focus on it
@@ -552,58 +490,7 @@ function CommentViewer() {
     }
   }, []);
 
-  const toggleSmallcaps = useCallback(() => {
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0 && !selection.isCollapsed) {
-      const range = selection.getRangeAt(0);
-      
-      // Check if selection already has smallcaps
-      const container = range.commonAncestorContainer;
-      const parent = container.nodeType === Node.TEXT_NODE ? container.parentElement : container;
-      
-      // Check if already smallcaps
-      let hasSmallcaps = false;
-      if (parent) {
-        const style = window.getComputedStyle(parent);
-        hasSmallcaps = style.fontVariant === "small-caps" || 
-                      parent.style.fontVariant === "small-caps" ||
-                      parent.classList.contains("smallcaps");
-      }
-      
-      if (hasSmallcaps) {
-        // Remove smallcaps - unwrap the span
-        if (parent.tagName === "SPAN" && (parent.style.fontVariant === "small-caps" || parent.classList.contains("smallcaps"))) {
-          const textContent = parent.textContent;
-          const textNode = document.createTextNode(textContent);
-          parent.parentNode.replaceChild(textNode, parent);
-          
-          // Reselect the text
-          const newRange = document.createRange();
-          newRange.selectNodeContents(textNode);
-          selection.removeAllRanges();
-          selection.addRange(newRange);
-        }
-      } else {
-        // Add smallcaps
-        const span = document.createElement("span");
-        span.style.fontVariant = "small-caps";
-        
-        try {
-          range.surroundContents(span);
-        } catch (e) {
-          // If surroundContents fails, manually wrap
-          const contents = range.extractContents();
-          span.appendChild(contents);
-          range.insertNode(span);
-        }
-        
-        // Collapse selection to end
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-    }
-  }, []);
+
 
   const toggleCellImplemented = useCallback((commentId, itemIndex, column) => {
     setComments((prevComments) => prevComments.map((comment) => {
@@ -1170,13 +1057,7 @@ function CommentViewer() {
           >
             R
           </button>
-          <button
-            onClick={toggleSmallcaps}
-            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs font-medium transition-colors"
-            title="Toggle Smallcaps (Ctrl+Shift+K)"
-          >
-            Sc
-          </button>
+
           <button
             onClick={() => applyFormat("removeFormat")}
             className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-red-400 text-xs transition-colors"
