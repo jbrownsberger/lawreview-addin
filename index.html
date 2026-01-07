@@ -305,8 +305,8 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       let cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
       
       // Replace nbsp around formatting tags with regular spaces
-      // Target formatting tags: strong, b, em, i, u, span, font
-      const tags = 'strong|b|em|i|u|span|font';
+      // Target formatting tags: strong, b, em, i, u, font (excluding span since it's used for nbsp-marker)
+      const tags = 'strong|b|em|i|u|font';
       // Before opening tag: \u00A0<tag> → <tag> (replace with regular space)
       cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
       // After opening tag: <tag>\u00A0 → <tag> (remove)
