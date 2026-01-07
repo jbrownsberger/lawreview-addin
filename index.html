@@ -166,7 +166,20 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
   const handleInput = useCallback((e) => {
     isUpdatingRef.current = true;
-    const rawHtml = e.target.innerHTML;
+    let rawHtml = e.target.innerHTML;
+    
+    // If we have marked nbsp (from smart format), restore them after cleaning browser-inserted ones
+    if (rawHtml.includes('<<<NBSP_MARKER>>>')) {
+      // Clean browser-inserted nbsp around formatting tags
+      rawHtml = rawHtml.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1')
+        .replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ')
+        .replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1')
+        .replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
+      
+      // Restore marked nbsp (user-typed ones)
+      rawHtml = rawHtml.replace(/<<<NBSP_MARKER>>>/g, '\u00A0');
+    }
+    
     const cleanHtml = cleanNonBreakingSpaces(rawHtml);
     onChange(cleanHtml);
     
@@ -312,46 +325,102 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     }
   }, [cleanNonBreakingSpaces]);
 
-  // Custom formatting function that doesn't use execCommand
-  // This prevents browsers from inserting unwanted nbsp around formatting tags
-  const applyCustomFormat = useCallback((tagName) => {
+  // Smart formatting that preserves user-typed nbsp while removing browser-inserted ones
+  const applySmartFormat = useCallback((command) => {
+    if (!editorRef.current) return;
+    
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
     
     const range = selection.getRangeAt(0);
     if (range.collapsed) return;
     
-    // Extract the selected content
-    const selectedContent = range.extractContents();
+    // Step 1: Save the current selection HTML and mark existing nbsp
+    const selectedFragment = range.cloneContents();
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(selectedFragment);
+    const selectedHtml = tempDiv.innerHTML;
     
-    // Create the formatting tag
-    const formatTag = document.createElement(tagName);
-    formatTag.appendChild(selectedContent);
+    // Mark nbsp in the ENTIRE editor before formatting
+    const fullHtml = editorRef.current.innerHTML;
+    const markedFullHtml = fullHtml.replace(/\u00A0/g, '<<<NBSP_MARKER>>>');
+    editorRef.current.innerHTML = markedFullHtml;
     
-    // Insert the formatted content
-    range.insertNode(formatTag);
+    // Restore selection - we need to find the same text position
+    // For simplicity, we'll try to restore it by text content
+    const textContent = range.toString();
+    if (textContent) {
+      // Find the text in the editor
+      const walker = document.createTreeWalker(
+        editorRef.current,
+        NodeFilter.SHOW_TEXT
+      );
+      
+      let foundStart = false;
+      let startNode = null, endNode = null;
+      let startOffset = 0, endOffset = 0;
+      let currentOffset = 0;
+      let searchIndex = 0;
+      
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const nodeText = node.textContent || '';
+        const nodeLength = nodeText.length;
+        
+        if (!foundStart) {
+          const index = nodeText.indexOf(textContent.charAt(0));
+          if (index >= 0 && nodeText.substr(index).startsWith(textContent)) {
+            startNode = node;
+            startOffset = index;
+            endNode = node;
+            endOffset = index + textContent.length;
+            foundStart = true;
+            break;
+          }
+        }
+      }
+      
+      if (startNode && endNode) {
+        const newRange = document.createRange();
+        try {
+          newRange.setStart(startNode, startOffset);
+          newRange.setEnd(endNode, endOffset);
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        } catch (e) {
+          console.error('Could not restore selection:', e);
+        }
+      }
+    }
     
-    // Restore selection around the formatted content
-    const newRange = document.createRange();
-    newRange.selectNodeContents(formatTag);
-    selection.removeAllRanges();
-    selection.addRange(newRange);
+    // Step 2: Apply formatting using execCommand
+    document.execCommand(command, false, null);
+    
+    // Step 3: Clean browser-inserted nbsp around formatting tags
+    let cleanedHtml = editorRef.current.innerHTML;
+    cleanedHtml = cleanedHtml.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1');
+    cleanedHtml = cleanedHtml.replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ');
+    cleanedHtml = cleanedHtml.replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1');
+    cleanedHtml = cleanedHtml.replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
+    
+    // Step 4: Restore marked nbsp (user-typed ones)
+    cleanedHtml = cleanedHtml.replace(/<<<NBSP_MARKER>>>/g, '\u00A0');
+    
+    editorRef.current.innerHTML = cleanedHtml;
     
     // Trigger input event to save changes
-    if (editorRef.current) {
-      editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-    }
+    editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
   }, []);
 
   const handleKeyDown = useCallback((e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
-      applyCustomFormat('strong');
+      applySmartFormat('bold');
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "i") {
       e.preventDefault();
-      applyCustomFormat('em');
+      applySmartFormat('italic');
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "u") {
@@ -479,31 +548,21 @@ function CommentViewer() {
 
   const applyFormat = useCallback((command) => {
     if (command === 'bold' || command === 'italic') {
-      // Use custom formatting for bold and italic to avoid browser-inserted nbsp
-      const selection = window.getSelection();
-      if (!selection.rangeCount) return;
-      
-      const range = selection.getRangeAt(0);
-      if (range.collapsed) return;
-      
-      // Extract the selected content
-      const selectedContent = range.extractContents();
-      
-      // Create the formatting tag
-      const tagName = command === 'bold' ? 'strong' : 'em';
-      const formatTag = document.createElement(tagName);
-      formatTag.appendChild(selectedContent);
-      
-      // Insert the formatted content
-      range.insertNode(formatTag);
-      
-      // Restore selection around the formatted content
-      const newRange = document.createRange();
-      newRange.selectNodeContents(formatTag);
-      selection.removeAllRanges();
-      selection.addRange(newRange);
+      // Use smart formatting that preserves user-typed nbsp
+      const activeElement = document.activeElement;
+      if (activeElement && activeElement.contentEditable === 'true') {
+        // Mark all nbsp before formatting
+        const originalHtml = activeElement.innerHTML;
+        activeElement.innerHTML = originalHtml.replace(/\u00A0/g, '<<<NBSP_MARKER>>>');
+        
+        // Apply formatting
+        document.execCommand(command, false, null);
+        
+        // The cleanup will happen in handleInput when it sees the markers
+      } else {
+        document.execCommand(command, false, null);
+      }
     } else {
-      // Use execCommand for other formatting
       document.execCommand(command, false, null);
     }
   }, []);
