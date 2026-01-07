@@ -149,16 +149,18 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   }, []);
 
   // Pre-compiled regex patterns for cleaning browser-inserted nbsp
+  // Note: nbsp before opening tags and after closing tags are converted to regular spaces
+  // to maintain word spacing, while nbsp inside formatted text are removed entirely
   const nbspCleanupPatterns = useMemo(() => {
     const tags = 'strong|b|em|i|u|span|font';
     return [
-      // Remove nbsp immediately before opening tag: \u00A0<tag> → <tag>
+      // Remove nbsp immediately before opening tag: \u00A0<tag> → <tag> (converts to regular space)
       { pattern: new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), replacement: ' $1' },
       // Remove nbsp immediately after opening tag: <tag>\u00A0 → <tag>
       { pattern: new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), replacement: '$1' },
       // Remove nbsp immediately before closing tag: \u00A0</tag> → </tag>
       { pattern: new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), replacement: '$1' },
-      // Remove nbsp immediately after closing tag: </tag>\u00A0 → </tag>
+      // Remove nbsp immediately after closing tag: </tag>\u00A0 → </tag> (converts to regular space)
       { pattern: new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), replacement: '$1 ' }
     ];
   }, []);
@@ -166,11 +168,9 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   // Helper function to remove browser-inserted nbsp adjacent to formatting tags
   const cleanBrowserInsertedNbsp = useCallback((html) => {
     if (!html) return html;
-    // Apply all cleanup patterns
-    nbspCleanupPatterns.forEach(({ pattern, replacement }) => {
-      html = html.replace(pattern, replacement);
-    });
-    return html;
+    // Apply all cleanup patterns using reduce for optimal performance
+    return nbspCleanupPatterns.reduce((result, { pattern, replacement }) => 
+      result.replace(pattern, replacement), html);
   }, [nbspCleanupPatterns]);
 
   useEffect(() => {
