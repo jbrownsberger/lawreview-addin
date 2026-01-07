@@ -308,7 +308,8 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       
       // Ensure all smallcaps elements have explicit font-variant inline style for Word compatibility
       container.querySelectorAll('[style*="font-variant"]').forEach((el) => {
-        if (el.style.fontVariant === "small-caps" || el.style.fontVariant.includes("small-caps")) {
+        const fontVariant = el.style.fontVariant;
+        if (fontVariant && (fontVariant === "small-caps" || fontVariant.includes("small-caps"))) {
           el.style.fontVariant = "small-caps";
         }
       });
