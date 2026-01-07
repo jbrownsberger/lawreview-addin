@@ -301,20 +301,23 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
-      let cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
+      // First, protect user-inserted nbsp by temporarily replacing nbsp-marker spans
+      // This allows us to clean browser-inserted nbsp while preserving user-inserted ones
+      const markerPlaceholder = '\uFFFD\uFFFE\uFFFD'; // Use Unicode replacement characters (very unlikely in user content)
+      let cleanedHtml = container.innerHTML.replace(/<span class="nbsp-marker">\u00A0<\/span>/g, markerPlaceholder);
       
-      // Replace nbsp around formatting tags with regular spaces
-      // Target formatting tags: strong, b, em, i, u, font (excluding span since it's used for nbsp-marker)
-      const tags = 'strong|b|em|i|u|font';
-      // Before opening tag: \u00A0<tag> → <tag> (replace with regular space)
+      // Clean browser-inserted nbsp around formatting tags (all remaining nbsp are browser-inserted)
+      const tags = 'strong|b|em|i|u|font|span';
       cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
-      // After opening tag: <tag>\u00A0 → <tag> (remove)
       cleanedHtml = cleanedHtml.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
-      // Before closing tag: \u00A0</tag> → </tag> (remove)
       cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
-      // After closing tag: </tag>\u00A0 → </tag> (replace with regular space)
       cleanedHtml = cleanedHtml.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
+      
+      // Restore nbsp-marker spans
+      cleanedHtml = cleanedHtml.replace(new RegExp(markerPlaceholder, 'g'), '<span class="nbsp-marker">\u00A0</span>');
+      
+      // Now remove the nbsp-marker spans, keeping the nbsp characters (user-inserted)
+      cleanedHtml = cleanNonBreakingSpaces(cleanedHtml);
       
       // Wrap content with Georgia 12pt font for consistent pasting
       const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + cleanedHtml + '</span>';
@@ -325,75 +328,20 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     }
   }, [cleanNonBreakingSpaces]);
 
-  const applyFormattingManually = useCallback((tagName) => {
-    const selection = window.getSelection();
-    if (!selection.rangeCount || selection.isCollapsed) return;
-    
-    const range = selection.getRangeAt(0);
-    
-    // Check if selection is already wrapped in this tag
-    let parentTag = range.commonAncestorContainer;
-    if (parentTag.nodeType === Node.TEXT_NODE) {
-      parentTag = parentTag.parentElement;
-    }
-    
-    const tagUpper = tagName.toUpperCase();
-    const altTag = tagName === 'strong' ? 'B' : (tagName === 'em' ? 'I' : tagUpper);
-    
-    // Walk up to find if we're inside this formatting
-    let isFormatted = false;
-    let formattedAncestor = null;
-    let node = parentTag;
-    while (node && node !== editorRef.current) {
-      if (node.tagName === tagUpper || node.tagName === altTag) {
-        isFormatted = true;
-        formattedAncestor = node;
-        break;
-      }
-      node = node.parentElement;
-    }
-    
-    if (isFormatted && formattedAncestor) {
-      // Remove formatting - extract contents and replace the tag
-      const parent = formattedAncestor.parentNode;
-      while (formattedAncestor.firstChild) {
-        parent.insertBefore(formattedAncestor.firstChild, formattedAncestor);
-      }
-      parent.removeChild(formattedAncestor);
-    } else {
-      // Apply formatting - wrap selection in tag
-      const contents = range.extractContents();
-      const wrapper = document.createElement(tagName);
-      wrapper.appendChild(contents);
-      range.insertNode(wrapper);
-      
-      // Move cursor to end of wrapper
-      range.selectNodeContents(wrapper);
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-    
-    // Trigger input event to save
-    if (editorRef.current) {
-      editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-  }, []);
-
   const handleKeyDown = useCallback((e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
-      applyFormattingManually('strong');
+      document.execCommand("bold", false, null);
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "i") {
       e.preventDefault();
-      applyFormattingManually('em');
+      document.execCommand("italic", false, null);
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "u") {
       e.preventDefault();
-      applyFormattingManually('u');
+      document.execCommand("underline", false, null);
       return;
     }
 
@@ -441,7 +389,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         }
       }
     }
-  }, [column, addRowAfter, commentId, itemIndex, applyFormattingManually]);
+  }, [column, addRowAfter, commentId, itemIndex]);
 
   return (
     <div className="relative w-full" style={{ paddingRight: "20px" }}>
@@ -515,72 +463,8 @@ function CommentViewer() {
   }, [currentUsername]);
 
   const applyFormat = useCallback((command) => {
-    const selection = window.getSelection();
-    if (!selection.rangeCount || selection.isCollapsed) return;
-    
-    const range = selection.getRangeAt(0);
-    const activeElement = document.activeElement;
-    
-    // Map command to tag name
-    const tagMap = {
-      'bold': 'strong',
-      'italic': 'em',
-      'underline': 'u'
-    };
-    
-    const tagName = tagMap[command];
-    if (!tagName) {
-      // Fall back to execCommand for unsupported commands
-      document.execCommand(command, false, null);
-      return;
-    }
-    
-    // Check if selection is already wrapped in this tag
-    let parentTag = range.commonAncestorContainer;
-    if (parentTag.nodeType === Node.TEXT_NODE) {
-      parentTag = parentTag.parentElement;
-    }
-    
-    const tagUpper = tagName.toUpperCase();
-    const altTag = tagName === 'strong' ? 'B' : (tagName === 'em' ? 'I' : tagUpper);
-    
-    // Walk up to find if we're inside this formatting
-    let isFormatted = false;
-    let formattedAncestor = null;
-    let node = parentTag;
-    while (node && activeElement && node !== activeElement) {
-      if (node.tagName === tagUpper || node.tagName === altTag) {
-        isFormatted = true;
-        formattedAncestor = node;
-        break;
-      }
-      node = node.parentElement;
-    }
-    
-    if (isFormatted && formattedAncestor) {
-      // Remove formatting
-      const parent = formattedAncestor.parentNode;
-      while (formattedAncestor.firstChild) {
-        parent.insertBefore(formattedAncestor.firstChild, formattedAncestor);
-      }
-      parent.removeChild(formattedAncestor);
-    } else {
-      // Apply formatting
-      const contents = range.extractContents();
-      const wrapper = document.createElement(tagName);
-      wrapper.appendChild(contents);
-      range.insertNode(wrapper);
-      
-      range.selectNodeContents(wrapper);
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-    
-    // Trigger input event on the active element
-    if (activeElement) {
-      activeElement.dispatchEvent(new Event('input', { bubbles: true }));
-    }
+    // Simple execCommand - nbsp cleanup happens in handleInput
+    document.execCommand(command, false, null);
   }, []);
 
   const toggleHighlight = useCallback(() => {
