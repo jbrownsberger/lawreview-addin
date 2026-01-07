@@ -1472,8 +1472,10 @@ function CommentViewer() {
                       </tr>
                     </thead>
                     <tbody>
-                      {comment.items.map((item, idx) => (
-                        <tr key={idx} className={"group" + (item.isHeading ? " bg-[#FEF9C3]" : (idx % 2 === 0 ? " bg-white" : " bg-gray-50")) + " hover:bg-[#E8EEF4] transition-colors"}>
+                      {comment.items.map((item, idx) => {
+                        const rowBgClass = item.isHeading ? "bg-[#FEF9C3]" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50");
+                        return (
+                        <tr key={idx} className={`group ${rowBgClass} hover:bg-[#E8EEF4] transition-colors`}>
                           <td className="px-1 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "40px", width: "40px" }}>
                             <input
                               type="text"
@@ -1516,7 +1518,7 @@ function CommentViewer() {
                           ))}
                           {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
                           <td className="px-1 py-0 align-top">
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0 py-0.5">
+                            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col gap-0 py-0.5">
                               <button
                                 onClick={() => addRowAfter(comment.id, idx)}
                                 className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors"
@@ -1541,7 +1543,8 @@ function CommentViewer() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
