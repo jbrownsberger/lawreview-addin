@@ -148,6 +148,27 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     return html.replace(/<span class="nbsp-marker">(\u00A0)<\/span>/g, '\u00A0');
   }, []);
 
+  // Helper function to remove browser-inserted nbsp adjacent to formatting tags
+  const cleanBrowserInsertedNbsp = useCallback((html) => {
+    if (!html) return html;
+    // Target formatting tags: strong, b, em, i, u, span, font
+    const tags = 'strong|b|em|i|u|span|font';
+    
+    // Remove nbsp immediately before opening tag: \u00A0<tag> → <tag>
+    html = html.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
+    
+    // Remove nbsp immediately after opening tag: <tag>\u00A0 → <tag>
+    html = html.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
+    
+    // Remove nbsp immediately before closing tag: \u00A0</tag> → </tag>
+    html = html.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
+    
+    // Remove nbsp immediately after closing tag: </tag>\u00A0 → </tag>
+    html = html.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
+    
+    return html;
+  }, []);
+
   useEffect(() => {
     if (editorRef.current && !editorRef.current.innerHTML) {
       editorRef.current.innerHTML = markNonBreakingSpaces(value || "");
@@ -169,11 +190,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     let rawHtml = e.target.innerHTML;
     
     // Clean browser-inserted nbsp around formatting tags
-    // This removes nbsp immediately adjacent to formatting tags (the "sticky" spaces)
-    rawHtml = rawHtml.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1')
-      .replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ')
-      .replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1')
-      .replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
+    rawHtml = cleanBrowserInsertedNbsp(rawHtml);
     
     const cleanHtml = cleanNonBreakingSpaces(rawHtml);
     onChange(cleanHtml);
@@ -207,7 +224,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       }
       isUpdatingRef.current = false;
     });
-  }, [onChange, cleanNonBreakingSpaces, markNonBreakingSpaces]);
+  }, [onChange, cleanNonBreakingSpaces, markNonBreakingSpaces, cleanBrowserInsertedNbsp]);
 
   const handlePaste = useCallback((e) => {
     e.preventDefault();
@@ -324,16 +341,49 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
       document.execCommand("bold", false, null);
+      // Clean nbsp after browser finishes DOM manipulation
+      requestAnimationFrame(() => {
+        if (editorRef.current) {
+          const cleanedHtml = cleanBrowserInsertedNbsp(editorRef.current.innerHTML);
+          if (cleanedHtml !== editorRef.current.innerHTML) {
+            editorRef.current.innerHTML = cleanedHtml;
+            // Trigger input event to save changes
+            editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      });
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "i") {
       e.preventDefault();
       document.execCommand("italic", false, null);
+      // Clean nbsp after browser finishes DOM manipulation
+      requestAnimationFrame(() => {
+        if (editorRef.current) {
+          const cleanedHtml = cleanBrowserInsertedNbsp(editorRef.current.innerHTML);
+          if (cleanedHtml !== editorRef.current.innerHTML) {
+            editorRef.current.innerHTML = cleanedHtml;
+            // Trigger input event to save changes
+            editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      });
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "u") {
       e.preventDefault();
       document.execCommand("underline", false, null);
+      // Clean nbsp after browser finishes DOM manipulation
+      requestAnimationFrame(() => {
+        if (editorRef.current) {
+          const cleanedHtml = cleanBrowserInsertedNbsp(editorRef.current.innerHTML);
+          if (cleanedHtml !== editorRef.current.innerHTML) {
+            editorRef.current.innerHTML = cleanedHtml;
+            // Trigger input event to save changes
+            editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      });
       return;
     }
 
@@ -381,7 +431,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         }
       }
     }
-  }, [column, addRowAfter, commentId, itemIndex]);
+  }, [column, addRowAfter, commentId, itemIndex, cleanBrowserInsertedNbsp]);
 
   return (
     <div className="relative w-full" style={{ paddingRight: "20px" }}>
