@@ -325,20 +325,75 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     }
   }, [cleanNonBreakingSpaces]);
 
+  const applyFormattingManually = useCallback((tagName) => {
+    const selection = window.getSelection();
+    if (!selection.rangeCount || selection.isCollapsed) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    // Check if selection is already wrapped in this tag
+    let parentTag = range.commonAncestorContainer;
+    if (parentTag.nodeType === Node.TEXT_NODE) {
+      parentTag = parentTag.parentElement;
+    }
+    
+    const tagUpper = tagName.toUpperCase();
+    const altTag = tagName === 'strong' ? 'B' : (tagName === 'em' ? 'I' : tagUpper);
+    
+    // Walk up to find if we're inside this formatting
+    let isFormatted = false;
+    let formattedAncestor = null;
+    let node = parentTag;
+    while (node && node !== editorRef.current) {
+      if (node.tagName === tagUpper || node.tagName === altTag) {
+        isFormatted = true;
+        formattedAncestor = node;
+        break;
+      }
+      node = node.parentElement;
+    }
+    
+    if (isFormatted && formattedAncestor) {
+      // Remove formatting - extract contents and replace the tag
+      const parent = formattedAncestor.parentNode;
+      while (formattedAncestor.firstChild) {
+        parent.insertBefore(formattedAncestor.firstChild, formattedAncestor);
+      }
+      parent.removeChild(formattedAncestor);
+    } else {
+      // Apply formatting - wrap selection in tag
+      const contents = range.extractContents();
+      const wrapper = document.createElement(tagName);
+      wrapper.appendChild(contents);
+      range.insertNode(wrapper);
+      
+      // Move cursor to end of wrapper
+      range.selectNodeContents(wrapper);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    
+    // Trigger input event to save
+    if (editorRef.current) {
+      editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }, []);
+
   const handleKeyDown = useCallback((e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
-      document.execCommand("bold", false, null);
+      applyFormattingManually('strong');
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "i") {
       e.preventDefault();
-      document.execCommand("italic", false, null);
+      applyFormattingManually('em');
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.key === "u") {
       e.preventDefault();
-      document.execCommand("underline", false, null);
+      applyFormattingManually('u');
       return;
     }
 
@@ -386,7 +441,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         }
       }
     }
-  }, [column, addRowAfter, commentId, itemIndex]);
+  }, [column, addRowAfter, commentId, itemIndex, applyFormattingManually]);
 
   return (
     <div className="relative w-full" style={{ paddingRight: "20px" }}>
@@ -460,8 +515,72 @@ function CommentViewer() {
   }, [currentUsername]);
 
   const applyFormat = useCallback((command) => {
-    // Simple execCommand - nbsp cleanup happens in handleInput
-    document.execCommand(command, false, null);
+    const selection = window.getSelection();
+    if (!selection.rangeCount || selection.isCollapsed) return;
+    
+    const range = selection.getRangeAt(0);
+    const activeElement = document.activeElement;
+    
+    // Map command to tag name
+    const tagMap = {
+      'bold': 'strong',
+      'italic': 'em',
+      'underline': 'u'
+    };
+    
+    const tagName = tagMap[command];
+    if (!tagName) {
+      // Fall back to execCommand for unsupported commands
+      document.execCommand(command, false, null);
+      return;
+    }
+    
+    // Check if selection is already wrapped in this tag
+    let parentTag = range.commonAncestorContainer;
+    if (parentTag.nodeType === Node.TEXT_NODE) {
+      parentTag = parentTag.parentElement;
+    }
+    
+    const tagUpper = tagName.toUpperCase();
+    const altTag = tagName === 'strong' ? 'B' : (tagName === 'em' ? 'I' : tagUpper);
+    
+    // Walk up to find if we're inside this formatting
+    let isFormatted = false;
+    let formattedAncestor = null;
+    let node = parentTag;
+    while (node && activeElement && node !== activeElement) {
+      if (node.tagName === tagUpper || node.tagName === altTag) {
+        isFormatted = true;
+        formattedAncestor = node;
+        break;
+      }
+      node = node.parentElement;
+    }
+    
+    if (isFormatted && formattedAncestor) {
+      // Remove formatting
+      const parent = formattedAncestor.parentNode;
+      while (formattedAncestor.firstChild) {
+        parent.insertBefore(formattedAncestor.firstChild, formattedAncestor);
+      }
+      parent.removeChild(formattedAncestor);
+    } else {
+      // Apply formatting
+      const contents = range.extractContents();
+      const wrapper = document.createElement(tagName);
+      wrapper.appendChild(contents);
+      range.insertNode(wrapper);
+      
+      range.selectNodeContents(wrapper);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    
+    // Trigger input event on the active element
+    if (activeElement) {
+      activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }, []);
 
   const toggleHighlight = useCallback(() => {
