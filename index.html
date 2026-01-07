@@ -301,12 +301,23 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
-      let cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
+      // First, protect user-inserted nbsp by temporarily replacing nbsp-marker spans
+      // This allows us to clean browser-inserted nbsp while preserving user-inserted ones
+      const markerPlaceholder = '___NBSP_MARKER___';
+      let cleanedHtml = container.innerHTML.replace(/<span class="nbsp-marker">\u00A0<\/span>/g, markerPlaceholder);
       
-      // Replace ALL nbsp with regular spaces when copying to prevent "rogue nbsp" in pasted content
-      // Note: This also converts user-inserted nbsp (like "M. Smith"), but ensures no unwanted nbsp appear
-      cleanedHtml = cleanedHtml.replace(/\u00A0/g, ' ');
+      // Clean browser-inserted nbsp around formatting tags (all remaining nbsp are browser-inserted)
+      const tags = 'strong|b|em|i|u|font|span';
+      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
+      cleanedHtml = cleanedHtml.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
+      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
+      cleanedHtml = cleanedHtml.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
+      
+      // Restore nbsp-marker spans
+      cleanedHtml = cleanedHtml.replace(new RegExp(markerPlaceholder, 'g'), '<span class="nbsp-marker">\u00A0</span>');
+      
+      // Now remove the nbsp-marker spans, keeping the nbsp characters (user-inserted)
+      cleanedHtml = cleanNonBreakingSpaces(cleanedHtml);
       
       // Wrap content with Georgia 12pt font for consistent pasting
       const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + cleanedHtml + '</span>';
