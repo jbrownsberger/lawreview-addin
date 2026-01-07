@@ -168,13 +168,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     isUpdatingRef.current = true;
     let rawHtml = e.target.innerHTML;
     
-    // Clean browser-inserted nbsp around formatting tags
-    // This removes nbsp immediately adjacent to formatting tags (the "sticky" spaces)
-    rawHtml = rawHtml.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1')
-      .replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ')
-      .replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1')
-      .replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
-    
     const cleanHtml = cleanNonBreakingSpaces(rawHtml);
     onChange(cleanHtml);
     
