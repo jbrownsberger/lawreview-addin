@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v44</title>
+<title>Law Review Comment Viewer - v45</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 44 - Compact layout with Notre Dame color palette");
+console.log("Law Review Add-in Version 45 - Degree symbol approach for nbsp");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -1435,7 +1435,7 @@ function CommentViewer() {
       {/* Footer */}
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v44</span>
+        <span>v45</span>
       </div>
     </div>
   );
