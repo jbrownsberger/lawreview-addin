@@ -73,24 +73,24 @@ function createEmptyItem() {
     _galleyImplemented: false
   };
 }
-
-// Build OOXML from DOM node
+// Build OOXML from DOM node - returns array of run objects
 function buildOoxmlFromNode(node) {
   if (node.nodeType === Node.TEXT_NODE) {
     const text = node.textContent;
-    if (!text) return '';
+    if (!text) return [];
     
-    // Convert degree symbols back to nbsp in the text
+    // Convert degree symbols to nbsp
     const convertedText = text.replace(/°/g, '\u00A0');
     
-    // Escape XML special characters
+    // Escape XML special characters - must escape & first!
     const escapedText = convertedText
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
     
-    return escapedText;
+    return [{ text: escapedText, bold: false, italic: false, red: false }];
   }
   
   if (node.nodeType === Node.ELEMENT_NODE) {
@@ -109,37 +109,27 @@ function buildOoxmlFromNode(node) {
       computedStyle.color === "rgb(255, 0, 0)" ||
       (tagName === "font" && node.getAttribute("color") === "red");
     
-    // Process children
-    let childContent = "";
+    // Process all children and collect runs
+    let runs = [];
     for (const child of node.childNodes) {
-      childContent += buildOoxmlFromNode(child);
+      const childRuns = buildOoxmlFromNode(child);
+      runs = runs.concat(childRuns);
     }
     
-    // If this node has formatting or text content, wrap in a run
-    if ((isBold || isItalic || isRed || childContent) && (isBold || isItalic || isRed)) {
-      let runProps = '<w:rPr>';
-      runProps += '<w:rFonts w:ascii="Georgia" w:hAnsi="Georgia" w:cs="Georgia"/>';
-      runProps += '<w:sz w:val="24"/><w:szCs w:val="24"/>';
-      
-      if (isBold) {
-        runProps += '<w:b/><w:bCs/>';
-      }
-      if (isItalic) {
-        runProps += '<w:i/><w:iCs/>';
-      }
-      if (isRed) {
-        runProps += '<w:color w:val="FF0000"/>';
-      }
-      
-      runProps += '</w:rPr>';
-      
-      return '<w:r>' + runProps + '<w:t xml:space="preserve">' + childContent + '</w:t></w:r>';
+    // Apply formatting to all runs from this node
+    if (isBold || isItalic || isRed) {
+      runs = runs.map(run => ({
+        ...run,
+        bold: run.bold || isBold,
+        italic: run.italic || isItalic,
+        red: run.red || isRed
+      }));
     }
     
-    return childContent;
+    return runs;
   }
   
-  return '';
+  return [];
 }
 
 // Build complete OOXML document from container
