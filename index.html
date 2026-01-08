@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v44</title>
+<title>Law Review Comment Viewer - v45</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -31,29 +31,13 @@ body {
 }
 .fade-in { animation: fadeIn 0.2s ease-in; }
 .save-indicator { transition: opacity 0.3s ease; }
-
-.nbsp-marker {
-  position: relative;
-  background-color: rgba(59, 130, 246, 0.1);
-}
-.nbsp-marker::before {
-  content: "°";
-  color: #3b82f6;
-  font-size: 0.8em;
-  font-weight: bold;
-  position: absolute;
-  top: -4px;
-  left: 50%;
-  transform: translateX(-50%);
-  pointer-events: none;
-}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 44 - Compact layout with Notre Dame color palette");
+console.log("Law Review Add-in Version 45 - Degree symbol approach for nbsp");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -134,73 +118,54 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
-  // Helper function to mark non-breaking spaces
-  const markNonBreakingSpaces = useCallback((html) => {
-    if (!html) return html;
-    // Replace nbsp with marked version - but avoid double-wrapping
-    return html.replace(/(?!<span class="nbsp-marker">)\u00A0(?!<\/span>)/g, '<span class="nbsp-marker">\u00A0</span>');
-  }, []);
-
-  // Helper function to clean nbsp markers for saving
-  const cleanNonBreakingSpaces = useCallback((html) => {
-    if (!html) return html;
-    // Remove the nbsp-marker spans but keep the nbsp character
-    return html.replace(/<span class="nbsp-marker">(\u00A0)<\/span>/g, '\u00A0');
-  }, []);
-
   useEffect(() => {
     if (editorRef.current && !editorRef.current.innerHTML) {
-      editorRef.current.innerHTML = markNonBreakingSpaces(value || "");
+      editorRef.current.innerHTML = value || "";
     }
-  }, [value, markNonBreakingSpaces]);
+  }, [value]);
 
   useEffect(() => {
     if (editorRef.current && !isUpdatingRef.current && document.activeElement !== editorRef.current) {
-      const currentHtml = editorRef.current.innerHTML;
-      const currentClean = cleanNonBreakingSpaces(currentHtml);
-      if (currentClean !== value && value !== undefined) {
-        editorRef.current.innerHTML = markNonBreakingSpaces(value || "");
+      if (editorRef.current.innerHTML !== value && value !== undefined) {
+        editorRef.current.innerHTML = value || "";
       }
     }
-  }, [value, markNonBreakingSpaces, cleanNonBreakingSpaces]);
+  }, [value]);
 
   const handleInput = useCallback((e) => {
     isUpdatingRef.current = true;
     let rawHtml = e.target.innerHTML;
     
-    const cleanHtml = cleanNonBreakingSpaces(rawHtml);
-    onChange(cleanHtml);
+    // Convert any nbsp to degree symbols (catches browser insertions during editing)
+    rawHtml = rawHtml.replace(/\u00A0/g, '°');
+    rawHtml = rawHtml.replace(/&nbsp;/gi, '°');
     
-    // Apply marking after a short delay to allow the change to propagate
-    requestAnimationFrame(() => {
-      if (editorRef.current) {
-        const markedHtml = markNonBreakingSpaces(editorRef.current.innerHTML);
-        if (markedHtml !== editorRef.current.innerHTML) {
-          // Save cursor position
-          const sel = window.getSelection();
-          const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-          const offset = range ? range.startOffset : 0;
-          const container = range ? range.startContainer : null;
-          
-          editorRef.current.innerHTML = markedHtml;
-          
-          // Restore cursor position
-          if (container && editorRef.current.contains(container)) {
-            try {
-              const newRange = document.createRange();
-              newRange.setStart(container, Math.min(offset, container.length || 0));
-              newRange.collapse(true);
-              sel.removeAllRanges();
-              sel.addRange(newRange);
-            } catch (e) {
-              // If cursor restoration fails, just continue
-            }
-          }
+    if (rawHtml !== e.target.innerHTML) {
+      // Save cursor position
+      const sel = window.getSelection();
+      const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+      const offset = range ? range.startOffset : 0;
+      const container = range ? range.startContainer : null;
+      
+      e.target.innerHTML = rawHtml;
+      
+      // Restore cursor position
+      if (container && e.target.contains(container)) {
+        try {
+          const newRange = document.createRange();
+          newRange.setStart(container, Math.min(offset, container.length || 0));
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        } catch (err) {
+          // If cursor restoration fails, continue
         }
       }
-      isUpdatingRef.current = false;
-    });
-  }, [onChange, cleanNonBreakingSpaces, markNonBreakingSpaces]);
+    }
+    
+    onChange(rawHtml);
+    isUpdatingRef.current = false;
+  }, [onChange]);
 
   const handlePaste = useCallback((e) => {
     e.preventDefault();
@@ -212,7 +177,9 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
       const processNode = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          return document.createTextNode(node.textContent);
+          // Convert nbsp to degree symbols in text content
+          const text = node.textContent.replace(/\u00A0/g, '°');
+          return document.createTextNode(text);
         }
 
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -275,18 +242,17 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         selection.addRange(range);
       }
       
-      // Mark any nbsp in the newly pasted content and trigger input event
+      // Trigger input event to save changes
       if (editorRef.current) {
-        const currentHtml = editorRef.current.innerHTML;
-        editorRef.current.innerHTML = markNonBreakingSpaces(currentHtml);
-        // Trigger input to save changes
         editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
       }
     } else {
       const text = e.clipboardData.getData("text/plain");
-      document.execCommand("insertText", false, text);
+      // Convert nbsp to degree symbols in plain text too
+      const convertedText = text.replace(/\u00A0/g, '°');
+      document.execCommand("insertText", false, convertedText);
     }
-  }, [markNonBreakingSpaces]);
+  }, []);
 
   const handleCopy = useCallback((e) => {
     const selection = window.getSelection();
@@ -301,34 +267,37 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      // First, protect user-inserted nbsp by temporarily replacing nbsp-marker spans
-      // This allows us to clean browser-inserted nbsp while preserving user-inserted ones
-      const markerPlaceholder = '\uFFFD\uFFFE\uFFFD'; // Use Unicode replacement characters (very unlikely in user content)
-      let cleanedHtml = container.innerHTML.replace(/<span class="nbsp-marker">\u00A0<\/span>/g, markerPlaceholder);
+      let html = container.innerHTML;
       
-      // Clean browser-inserted nbsp around formatting tags (all remaining nbsp are browser-inserted)
-      const tags = 'strong|b|em|i|u|font|span';
-      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
+      // Step 1: Remove ALL nbsp (these are all browser-inserted since we never store them)
+      // This is fail-safe: even if conversion fails elsewhere, we clean browser-inserted nbsp here
+      html = html.replace(/\u00A0/g, '');
+      html = html.replace(/&nbsp;/gi, '');
       
-      // Restore nbsp-marker spans
-      cleanedHtml = cleanedHtml.replace(new RegExp(markerPlaceholder, 'g'), '<span class="nbsp-marker">\u00A0</span>');
-      
-      // Now remove the nbsp-marker spans, keeping the nbsp characters (user-inserted)
-      cleanedHtml = cleanNonBreakingSpaces(cleanedHtml);
+      // Step 2: Convert degree symbols back to nbsp (these are user-intentional)
+      html = html.replace(/°/g, '\u00A0');
       
       // Wrap content with Georgia 12pt font for consistent pasting
-      const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + cleanedHtml + '</span>';
+      const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + html + '</span>';
 
-      e.clipboardData.setData("text/plain", container.textContent);
+      // For plain text, also convert degree symbols to nbsp
+      let plainText = container.textContent.replace(/°/g, '\u00A0');
+      
+      e.clipboardData.setData("text/plain", plainText);
       e.clipboardData.setData("text/html", wrappedHtml);
       e.preventDefault();
     }
-  }, [cleanNonBreakingSpaces]);
+  }, []);
 
   const handleKeyDown = useCallback((e) => {
+    // Intercept nbsp key combinations and insert degree symbol instead
+    // Mac: Option+Space, Windows: Ctrl+Shift+Space
+    if (e.key === ' ' && (e.altKey || (e.ctrlKey && e.shiftKey))) {
+      e.preventDefault();
+      document.execCommand("insertText", false, "°");
+      return;
+    }
+
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
       document.execCommand("bold", false, null);
@@ -1467,7 +1436,7 @@ function CommentViewer() {
       {/* Footer */}
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v44</span>
+        <span>v45</span>
       </div>
     </div>
   );
