@@ -168,6 +168,13 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     isUpdatingRef.current = true;
     let rawHtml = e.target.innerHTML;
     
+    // Clean browser-inserted nbsp around formatting tags
+    // This removes nbsp immediately adjacent to formatting tags (the "sticky" spaces)
+    rawHtml = rawHtml.replace(/\u00A0(<(?:strong|em|span[^>]*)>)/g, ' $1')
+      .replace(/(<(?:strong|em|span[^>]*)>)\u00A0/g, '$1 ')
+      .replace(/\u00A0(<\/(?:strong|em|span)>)/g, ' $1')
+      .replace(/(<\/(?:strong|em|span)>)\u00A0/g, '$1 ');
+    
     const cleanHtml = cleanNonBreakingSpaces(rawHtml);
     onChange(cleanHtml);
     
@@ -301,23 +308,8 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      // First, protect user-inserted nbsp by temporarily replacing nbsp-marker spans
-      // This allows us to clean browser-inserted nbsp while preserving user-inserted ones
-      const markerPlaceholder = '\uFFFD\uFFFE\uFFFD'; // Use Unicode replacement characters (very unlikely in user content)
-      let cleanedHtml = container.innerHTML.replace(/<span class="nbsp-marker">\u00A0<\/span>/g, markerPlaceholder);
-      
-      // Clean browser-inserted nbsp around formatting tags (all remaining nbsp are browser-inserted)
-      const tags = 'strong|b|em|i|u|font|span';
-      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
-      
-      // Restore nbsp-marker spans
-      cleanedHtml = cleanedHtml.replace(new RegExp(markerPlaceholder, 'g'), '<span class="nbsp-marker">\u00A0</span>');
-      
-      // Now remove the nbsp-marker spans, keeping the nbsp characters (user-inserted)
-      cleanedHtml = cleanNonBreakingSpaces(cleanedHtml);
+      // Clean nbsp markers from HTML but preserve the nbsp characters and all other formatting
+      const cleanedHtml = cleanNonBreakingSpaces(container.innerHTML);
       
       // Wrap content with Georgia 12pt font for consistent pasting
       const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + cleanedHtml + '</span>';
