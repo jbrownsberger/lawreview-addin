@@ -356,8 +356,9 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       // - \rtf1\ansi\deff0: RTF version 1, ANSI encoding, default font 0
       // - \fonttbl: Font table defining Georgia as font 0
       // - \colortbl: Color table with red (255,0,0) as color 1
+      // - \pard: paragraph defaults
       // - \f0\fs24: Use font 0 (Georgia) at 12pt (24 half-points)
-      const rtfDocument = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}{\\colortbl;\\red255\\green0\\blue0;}\\f0\\fs24 " + contentRTF + "}";
+      const rtfDocument = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}{\\colortbl;\\red255\\green0\\blue0;}\\pard\\f0\\fs24 " + contentRTF + "\\par}";
       
       // For plain text, convert degree symbols to nbsp
       let plainText = container.textContent.replace(/°/g, '\u00A0');
