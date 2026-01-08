@@ -270,6 +270,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       let html = container.innerHTML;
       
       // Step 1: Remove ALL nbsp (these are all browser-inserted since we never store them)
+      // This is fail-safe: even if conversion fails elsewhere, we clean browser-inserted nbsp here
       html = html.replace(/\u00A0/g, '');
       html = html.replace(/&nbsp;/gi, '');
       
