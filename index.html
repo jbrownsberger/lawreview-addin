@@ -302,21 +302,30 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       });
       
       // First, protect user-inserted nbsp by temporarily replacing nbsp-marker spans
-      // This allows us to clean browser-inserted nbsp while preserving user-inserted ones
-      const markerPlaceholder = '\uFFFD\uFFFE\uFFFD'; // Use Unicode replacement characters (very unlikely in user content)
+      const markerPlaceholder = '\uFFFD\uFFFE\uFFFD';
       let cleanedHtml = container.innerHTML.replace(/<span class="nbsp-marker">\u00A0<\/span>/g, markerPlaceholder);
       
-      // Clean browser-inserted nbsp around formatting tags (all remaining nbsp are browser-inserted)
-      const tags = 'strong|b|em|i|u|font|span';
-      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<(?:${tags})(?:\\s[^>]*)?>)`, 'g'), ' $1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`(<(?:${tags})(?:\\s[^>]*)?>)\\u00A0`, 'g'), '$1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`\\u00A0(<\\/(?:${tags})>)`, 'g'), '$1');
-      cleanedHtml = cleanedHtml.replace(new RegExp(`(<\\/(?:${tags})>)\\u00A0`, 'g'), '$1 ');
+      // Clean browser-inserted nbsp around formatting tags
+      // Target: bold (strong, b), italic (em, i), and red text (font, span with color)
+      const formattingTags = 'strong|b|em|i|font|span';
       
-      // Restore nbsp-marker spans
+      // The nbsp character - use the actual Unicode character
+      const nbsp = '\u00A0';
+      const nbspPattern = `(?:&nbsp;|${nbsp})`;
+      
+      // Before opening tags: nbsp followed by <tag>
+      cleanedHtml = cleanedHtml.replace(new RegExp(`${nbspPattern}+(<(?:${formattingTags})(?:\\s[^>]*)?>)`, 'gi'), ' $1');
+      // After opening tags: <tag> followed by nbsp  
+      cleanedHtml = cleanedHtml.replace(new RegExp(`(<(?:${formattingTags})(?:\\s[^>]*)?>)${nbspPattern}+`, 'gi'), '$1');
+      // Before closing tags: nbsp followed by </tag>
+      cleanedHtml = cleanedHtml.replace(new RegExp(`${nbspPattern}+(<\\/(?:${formattingTags})>)`, 'gi'), '$1');
+      // After closing tags: </tag> followed by nbsp
+      cleanedHtml = cleanedHtml.replace(new RegExp(`(<\\/(?:${formattingTags})>)${nbspPattern}+`, 'gi'), '$1 ');
+      
+      // Restore user-inserted nbsp markers
       cleanedHtml = cleanedHtml.replace(new RegExp(markerPlaceholder, 'g'), '<span class="nbsp-marker">\u00A0</span>');
       
-      // Now remove the nbsp-marker spans, keeping the nbsp characters (user-inserted)
+      // Remove the nbsp-marker spans, keeping the nbsp characters (user-inserted)
       cleanedHtml = cleanNonBreakingSpaces(cleanedHtml);
       
       // Wrap content with Georgia 12pt font for consistent pasting
