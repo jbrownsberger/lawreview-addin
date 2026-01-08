@@ -302,6 +302,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       });
       
       // First, protect user-inserted nbsp by temporarily replacing nbsp-marker spans
+      // Use unlikely Unicode replacement characters as placeholder (extremely rare in normal content)
       const markerPlaceholder = '\uFFFD\uFFFE\uFFFD';
       let cleanedHtml = container.innerHTML.replace(/<span class="nbsp-marker">\u00A0<\/span>/g, markerPlaceholder);
       
@@ -310,6 +311,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       const formattingTags = 'strong|b|em|i|font|span';
       
       // The nbsp character - use the actual Unicode character
+      // Note: \u00A0 is not a regex metacharacter, so it's safe to use directly in patterns
       const nbsp = '\u00A0';
       const nbspPattern = `(?:&nbsp;|${nbsp})`;
       
