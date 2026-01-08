@@ -313,6 +313,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       // The nbsp character - use the actual Unicode character
       // Note: \u00A0 is not a regex metacharacter, so it's safe to use directly in patterns
       const nbsp = '\u00A0';
+      // Match both &nbsp; entity and \u00A0 character since browsers may represent it differently
       const nbspPattern = `(?:&nbsp;|${nbsp})`;
       
       // Before opening tags: nbsp followed by <tag>
