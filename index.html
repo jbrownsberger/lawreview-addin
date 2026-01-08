@@ -656,7 +656,8 @@ function CommentViewer() {
     try {
       await Word.run(async (context) => {
         const selection = context.document.getSelection();
-        selection.insertOoxml(pendingOoxml, Word.InsertLocation.replace);
+        // Use 'end' to insert at cursor position, replacing any selected text
+        selection.insertOoxml(pendingOoxml, Word.InsertLocation.end);
         await context.sync();
         
         setPasteStatus("success");
@@ -667,6 +668,7 @@ function CommentViewer() {
       });
     } catch (error) {
       console.error("Error pasting into Word:", error);
+      console.error("Error details:", error.debugInfo || error.message);
       setPasteStatus("error");
       setTimeout(() => {
         setPasteStatus("ready");
