@@ -136,29 +136,56 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     isUpdatingRef.current = true;
     let rawHtml = e.target.innerHTML;
     
-    // Convert any nbsp to degree symbols (catches browser insertions during editing)
-    rawHtml = rawHtml.replace(/\u00A0/g, '°');
-    rawHtml = rawHtml.replace(/&nbsp;/gi, '°');
+    // Check if we need to convert any nbsp to degree symbols
+    const hasNbsp = /\u00A0|&nbsp;/i.test(rawHtml);
     
-    if (rawHtml !== e.target.innerHTML) {
-      // Save cursor position
+    if (hasNbsp) {
+      // Calculate cursor offset as character count from start
       const sel = window.getSelection();
-      const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-      const offset = range ? range.startOffset : 0;
-      const container = range ? range.startContainer : null;
+      let cursorOffset = 0;
       
+      if (sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(e.target);
+        preCaretRange.setEnd(range.startContainer, range.startOffset);
+        cursorOffset = preCaretRange.toString().length;
+      }
+      
+      // Convert nbsp to degree symbols
+      rawHtml = rawHtml.replace(/\u00A0/g, '°');
+      rawHtml = rawHtml.replace(/&nbsp;/gi, '°');
       e.target.innerHTML = rawHtml;
       
-      // Restore cursor position
-      if (container && e.target.contains(container)) {
-        try {
-          const newRange = document.createRange();
-          newRange.setStart(container, Math.min(offset, container.length || 0));
-          newRange.collapse(true);
+      // Restore cursor position by character offset
+      if (sel.rangeCount > 0) {
+        const newRange = document.createRange();
+        let charCount = 0;
+        let found = false;
+        
+        const walkNodes = (node) => {
+          if (found) return;
+          if (node.nodeType === Node.TEXT_NODE) {
+            const nextCount = charCount + node.textContent.length;
+            if (cursorOffset <= nextCount) {
+              newRange.setStart(node, cursorOffset - charCount);
+              newRange.collapse(true);
+              found = true;
+            }
+            charCount = nextCount;
+          } else {
+            for (const child of node.childNodes) {
+              walkNodes(child);
+              if (found) return;
+            }
+          }
+        };
+        
+        walkNodes(e.target);
+        
+        if (found) {
           sel.removeAllRanges();
           sel.addRange(newRange);
-        } catch (err) {
-          // If cursor restoration fails, continue
         }
       }
     }
@@ -267,24 +294,76 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      let html = container.innerHTML;
+      // Escape text properly for RTF
+      const escapeRTFText = (text) => {
+        // First, convert degree symbols to a unique placeholder to avoid double-escaping
+        text = text.replace(/°/g, '___DEGREE_NBSP___');
+        // Then escape backslashes
+        text = text.replace(/\\/g, '\\\\');
+        // Escape braces
+        text = text.replace(/\{/g, '\\{');
+        text = text.replace(/\}/g, '\\}');
+        // Finally replace placeholder with RTF non-breaking space
+        text = text.replace(/___DEGREE_NBSP___/g, '\\~');
+        return text;
+      };
       
-      // Step 1: Remove ALL nbsp (these are all browser-inserted since we never store them)
-      // This is fail-safe: even if conversion fails elsewhere, we clean browser-inserted nbsp here
-      html = html.replace(/\u00A0/g, '');
-      html = html.replace(/&nbsp;/gi, '');
+      const convertToRTF = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          return escapeRTFText(node.textContent);
+        }
+        
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tagName = node.tagName.toLowerCase();
+          const style = node.style;
+          const computedStyle = window.getComputedStyle(node);
+          
+          const isBold = tagName === "b" || tagName === "strong" ||
+            style.fontWeight === "bold" || style.fontWeight === "700" ||
+            computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700";
+          const isItalic = tagName === "i" || tagName === "em" ||
+            style.fontStyle === "italic" ||
+            computedStyle.fontStyle === "italic";
+          const isRed = style.color === "red" || style.color === "rgb(255, 0, 0)" ||
+            computedStyle.color === "rgb(255, 0, 0)" ||
+            (node.tagName.toLowerCase() === "font" && node.getAttribute("color") === "red");
+          
+          let childRTF = "";
+          for (const child of node.childNodes) {
+            childRTF += convertToRTF(child);
+          }
+          
+          let result = childRTF;
+          if (isRed) {
+            result = "\\cf1 " + result + "\\cf0 ";
+          }
+          if (isItalic) {
+            result = "\\i " + result + "\\i0 ";
+          }
+          if (isBold) {
+            result = "\\b " + result + "\\b0 ";
+          }
+          
+          return result;
+        }
+        
+        return "";
+      };
       
-      // Step 2: Convert degree symbols back to nbsp (these are user-intentional)
-      html = html.replace(/°/g, '\u00A0');
+      const contentRTF = convertToRTF(container);
       
-      // Wrap content with Georgia 12pt font for consistent pasting
-      const wrappedHtml = '<span style="font-family:Georgia,serif;font-size:12pt;">' + html + '</span>';
-
-      // For plain text, also convert degree symbols to nbsp
+      // Build RTF document with proper structure:
+      // - \rtf1\ansi\deff0: RTF version 1, ANSI encoding, default font 0
+      // - \fonttbl: Font table defining Georgia as font 0
+      // - \colortbl: Color table with red (255,0,0) as color 1
+      // - \f0\fs24: Use font 0 (Georgia) at 12pt (24 half-points)
+      const rtfDocument = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}{\\colortbl;\\red255\\green0\\blue0;}\\f0\\fs24 " + contentRTF + "}";
+      
+      // For plain text, convert degree symbols to nbsp
       let plainText = container.textContent.replace(/°/g, '\u00A0');
       
       e.clipboardData.setData("text/plain", plainText);
-      e.clipboardData.setData("text/html", wrappedHtml);
+      e.clipboardData.setData("text/rtf", rtfDocument);
       e.preventDefault();
     }
   }, []);
