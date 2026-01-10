@@ -287,40 +287,46 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         text = text.replace(/___DEGREE_NBSP___/g, '\\~');
         return text;
       };
-      
       const convertToRTF = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
           return escapeRTFText(node.textContent);
         }
-        
+      
         if (node.nodeType === Node.ELEMENT_NODE) {
           const tagName = node.tagName.toLowerCase();
           const style = node.style;
           const computedStyle = window.getComputedStyle(node);
-          
-          const isBold = tagName === "b" || tagName === "strong" ||
-            style.fontWeight === "bold" || style.fontWeight === "700" ||
-            computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700";
-          const isItalic = tagName === "i" || tagName === "em" ||
-            style.fontStyle === "italic" ||
+      
+          const weight = computedStyle.fontWeight;
+          const isBold =
+            tagName === "b" ||
+            tagName === "strong" ||
+            (!isNaN(weight) && parseInt(weight, 10) >= 600);
+      
+          const isItalic =
+            tagName === "i" ||
+            tagName === "em" ||
             computedStyle.fontStyle === "italic";
-          
+      
           let childRTF = "";
           for (const child of node.childNodes) {
             childRTF += convertToRTF(child);
           }
-          
-          let result = childRTF;
-          if (isItalic) {
-            result = "{\\i " + result + "}";
+      
+          // IMPORTANT: group formatting with braces
+          if (isBold && isItalic) {
+            return `{\\b\\i ${childRTF}}`;
           }
           if (isBold) {
-            result = "{\\b " + result + "}";
+            return `{\\b ${childRTF}}`;
           }
-          
-          return result;
+          if (isItalic) {
+            return `{\\i ${childRTF}}`;
+          }
+      
+          return childRTF;
         }
-        
+      
         return "";
       };
       
