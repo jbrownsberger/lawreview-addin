@@ -312,10 +312,10 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
           
           let result = childRTF;
           if (isItalic) {
-            result = "\\i " + result + "\\i0 ";
+            result = "{\\i " + result + "}";
           }
           if (isBold) {
-            result = "\\b " + result + "\\b0 ";
+            result = "{\\b " + result + "}";
           }
           
           return result;
@@ -325,7 +325,12 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       };
       
       const contentRTF = convertToRTF(container);
-      const rtfDocument = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}\\pard\\f0\\fs24 " + contentRTF + "\\par}";
+      
+      // More complete RTF document structure with proper font table
+      const rtfDocument = "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat{\\fonttbl{\\f0\\fnil\\fcharset0 Georgia;}}" +
+        "{\\colortbl ;\\red0\\green0\\blue0;}" +
+        "\\viewkind4\\uc1\\pard\\f0\\fs24 " + contentRTF + "}";
+      
       let plainText = container.textContent.replace(/°/g, '\u00A0');
       
       e.clipboardData.setData("text/plain", plainText);
