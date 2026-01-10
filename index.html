@@ -37,17 +37,15 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 47 - Cleaned up");
+console.log("Law Review Add-in Version 47");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-// Constants
 const AUTO_SAVE_DELAY = 2000;
 const LOCATION_PREVIEW_LENGTH = 50;
 const MAX_HISTORY_SIZE = 50;
 const DEBOUNCE_DELAY = 300;
 
-// Debounce hook
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -57,7 +55,6 @@ function useDebounce(value, delay) {
   return debouncedValue;
 }
 
-// Create empty item helper
 function createEmptyItem() {
   return {
     id: "",
@@ -74,7 +71,6 @@ function createEmptyItem() {
   };
 }
 
-// Chevron icons
 function ChevronDown() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -91,7 +87,6 @@ function ChevronUp() {
   );
 }
 
-// Save status indicator
 function SaveIndicator({ status }) {
   if (status === "saving") {
     return (
@@ -113,7 +108,6 @@ function SaveIndicator({ status }) {
   return <span className="save-indicator text-xs opacity-0"></span>;
 }
 
-// Rich text cell component
 function RichTextCell({ value, onChange, placeholder, column, commentId, itemIndex, addRowAfter }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
@@ -136,11 +130,9 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     isUpdatingRef.current = true;
     let rawHtml = e.target.innerHTML;
     
-    // Check if we need to convert any nbsp to degree symbols
     const hasNbsp = /\u00A0|&nbsp;/i.test(rawHtml);
     
     if (hasNbsp) {
-      // Calculate cursor offset as character count from start
       const sel = window.getSelection();
       let cursorOffset = 0;
       
@@ -152,12 +144,10 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         cursorOffset = preCaretRange.toString().length;
       }
       
-      // Convert nbsp to degree symbols
       rawHtml = rawHtml.replace(/\u00A0/g, '°');
       rawHtml = rawHtml.replace(/&nbsp;/gi, '°');
       e.target.innerHTML = rawHtml;
       
-      // Restore cursor position by character offset
       if (sel.rangeCount > 0) {
         const newRange = document.createRange();
         let charCount = 0;
@@ -204,7 +194,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
       const processNode = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          // Convert nbsp to degree symbols in text content
           const text = node.textContent.replace(/\u00A0/g, '°');
           return document.createTextNode(text);
         }
@@ -223,7 +212,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
           const children = Array.from(node.childNodes).map(processNode);
 
-          // Build the element hierarchy - italic, then bold outermost
           let resultElement = null;
           
           if (isItalic) {
@@ -269,13 +257,11 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         selection.addRange(range);
       }
       
-      // Trigger input event to save changes
       if (editorRef.current) {
         editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
       }
     } else {
       const text = e.clipboardData.getData("text/plain");
-      // Convert nbsp to degree symbols in plain text too
       const convertedText = text.replace(/\u00A0/g, '°');
       document.execCommand("insertText", false, convertedText);
     }
@@ -288,22 +274,16 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       const container = document.createElement("div");
       container.appendChild(range.cloneContents());
 
-      // Remove background styling but keep other formatting
       container.querySelectorAll('[style*="background"]').forEach((el) => {
         el.style.backgroundColor = "";
         el.style.background = "";
       });
       
-      // Escape text properly for RTF
       const escapeRTFText = (text) => {
-        // First, convert degree symbols to a unique placeholder to avoid double-escaping
         text = text.replace(/°/g, '___DEGREE_NBSP___');
-        // Then escape backslashes
         text = text.replace(/\\/g, '\\\\');
-        // Escape braces
         text = text.replace(/\{/g, '\\{');
         text = text.replace(/\}/g, '\\}');
-        // Finally replace placeholder with RTF non-breaking space
         text = text.replace(/___DEGREE_NBSP___/g, '\\~');
         return text;
       };
@@ -345,15 +325,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       };
       
       const contentRTF = convertToRTF(container);
-      
-      // Build RTF document with proper structure:
-      // - \rtf1\ansi\deff0: RTF version 1, ANSI encoding, default font 0
-      // - \fonttbl: Font table defining Georgia as font 0
-      // - \pard: paragraph defaults
-      // - \f0\fs24: Use font 0 (Georgia) at 12pt (24 half-points)
       const rtfDocument = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Georgia;}}\\pard\\f0\\fs24 " + contentRTF + "\\par}";
-      
-      // For plain text, convert degree symbols to nbsp
       let plainText = container.textContent.replace(/°/g, '\u00A0');
       
       e.clipboardData.setData("text/plain", plainText);
@@ -363,8 +335,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   }, []);
 
   const handleKeyDown = useCallback((e) => {
-    // Intercept nbsp key combinations and insert degree symbol instead
-    // Mac: Option+Space, Windows: Ctrl+Shift+Space
     if (e.key === ' ' && (e.altKey || (e.ctrlKey && e.shiftKey))) {
       e.preventDefault();
       document.execCommand("insertText", false, "°");
@@ -389,10 +359,8 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
     if (e.shiftKey && e.key === "Enter") {
       e.preventDefault();
-      // Add a new row and focus on it
       if (addRowAfter && commentId && itemIndex !== undefined) {
         addRowAfter(commentId, itemIndex);
-        // Focus on the new row after it's created
         setTimeout(() => {
           const allCells = Array.from(document.querySelectorAll('[data-cell-column="' + column + '"]'));
           const currentIndex = allCells.indexOf(editorRef.current);
@@ -457,220 +425,12 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
           {placeholder}
         </div>
       )}
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-2">
-        {loading ? (
-          <div className="text-center text-gray-500 mt-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-600 mb-2"></div>
-            <p className="text-sm">Loading comments...</p>
-          </div>
-        ) : comments.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8 bg-white p-6 rounded border border-gray-200 max-w-sm mx-auto">
-            <p className="text-base mb-2">📋 No comments yet</p>
-            <p className="text-xs mb-1">Select some text and click "New Comment" to get started.</p>
-            <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
-          </div>
-        ) : filteredComments.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8">
-            <p>No comments match "{debouncedSearchQuery}"</p>
-            <button
-              onClick={() => setSearchQuery("")}
-              className="mt-2 text-sky-500 hover:text-sky-600 text-sm"
-            >
-              Clear search
-            </button>
-          </div>
-        ) : (
-          filteredComments.map((comment) => (
-            <div
-              key={comment.id}
-              id={"comment-" + comment.id}
-              className={"mb-2 bg-white rounded border border-gray-200 shadow-sm" + (expandedComments.has(comment.id) ? " border-l-4 border-[#C99700]" : "")}
-            >
-              {/* Comment Header */}
-              <div className="px-1.5 py-0.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-1.5">
-                <div
-                  className="flex items-center gap-1.5 flex-1 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors"
-                  onClick={() => toggleExpand(comment.id)}
-                >
-                  {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
-                  <div className="text-xs">
-                    <span
-                      className="font-semibold text-gray-700 cursor-pointer hover:underline hover:text-[#C99700]"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        jumpToComment(comment.id);
-                      }}
-                    >
-                      {comment.id}
-                    </span>
-                    <span className="mx-1 text-gray-400">({comment.items.length})</span>
-                    <span className="mx-1 text-gray-400">•</span>
-                    <span className="text-gray-600">{comment.location}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Comment Table */}
-              {expandedComments.has(comment.id) && (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-xs">
-                    <thead className="bg-gray-100 border-b border-gray-300">
-                      <tr>
-                        <th className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r border-gray-200" style={{ minWidth: "40px", width: "40px" }}>#</th>
-                        {columns.map((col) => (
-                          !collapsedColumns.has(col.key) ? (
-                            <th
-                              key={col.key}
-                              className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors"
-                              style={{ minWidth: "250px" }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleColumn(col.key);
-                              }}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div>{col.label}</div>
-                                  {(() => {
-                                    const editorKey = "_" + col.key + "Editor";
-                                    const editors = comment.items.map((item) => item[editorKey]).filter(Boolean);
-                                    const lastEditor = editors[editors.length - 1];
-                                    return lastEditor ? (
-                                      <div className="text-xs font-normal text-gray-500 italic">{lastEditor}</div>
-                                    ) : null;
-                                  })()}
-                                </div>
-                                <ChevronUp />
-                              </div>
-                            </th>
-                          ) : null
-                        ))}
-                        {collapsedColumns.size > 0 && (
-                          <th className="px-1 py-1 text-center font-semibold text-gray-500 border-r border-gray-200">
-                            <div className="flex flex-col gap-0.5">
-                              {Array.from(collapsedColumns).map((col) => (
-                                <button
-                                  key={col}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleColumn(col);
-                                  }}
-                                  className="px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1 transition-colors"
-                                >
-                                  <ChevronDown /> {col.charAt(0).toUpperCase() + col.slice(1)}
-                                </button>
-                              ))}
-                            </div>
-                          </th>
-                        )}
-                        <th className="px-1 py-1 w-8"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {comment.items.map((item, idx) => {
-                        const rowBgClass = item.isHeading ? "bg-[#FEF9C3]" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50");
-                        return (
-                        <tr key={idx} className={`group ${rowBgClass} transition-colors`}>
-                          <td className="px-1 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "40px", width: "40px" }}>
-                            <input
-                              type="text"
-                              value={item.id}
-                              onChange={(e) => updateCell(comment.id, idx, "id", e.target.value)}
-                              className={"w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs" + (item.isHeading ? " font-bold" : "")}
-                              placeholder="#"
-                            />
-                          </td>
-                          {columns.map((col) => (
-                            !collapsedColumns.has(col.key) ? (
-                              <td
-                                key={col.key}
-                                className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}
-                              >
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleCellImplemented(comment.id, idx, col.key);
-                                  }}
-                                  className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")}
-                                  style={{ zIndex: 20, cursor: "pointer" }}
-                                  title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}
-                                >
-                                  ✓
-                                </button>
-                                <div className={item.isHeading ? "font-semibold" : ""}>
-                                  <MemoizedRichTextCell
-                                    value={item[col.key]}
-                                    onChange={(html) => updateCell(comment.id, idx, col.key, html)}
-                                    placeholder="—"
-                                    column={col.key}
-                                    commentId={comment.id}
-                                    itemIndex={idx}
-                                    addRowAfter={addRowAfter}
-                                  />
-                                </div>
-                              </td>
-                            ) : null
-                          ))}
-                          {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
-                          <td className="px-1 py-0 align-top">
-                            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col gap-0 py-0.5">
-                              <button
-                                onClick={() => addRowAfter(comment.id, idx)}
-                                className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors"
-                                title="Add row below"
-                              >
-                                +
-                              </button>
-                              <button
-                                onClick={() => toggleHeading(comment.id, idx)}
-                                className={"w-5 h-4 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-[#C99700] text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")}
-                                title="Toggle heading"
-                              >
-                                H
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirm({ commentId: comment.id, itemIndex: idx })}
-                                className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors"
-                                title="Delete row"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
-        <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v47</span>
-      </div>
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById("root")).render(<CommentViewer />);
-</script>
-</body>
-</html>
     </div>
   );
 }
 
 const MemoizedRichTextCell = React.memo(RichTextCell);
 
-// Main component
 function CommentViewer() {
   const [expandedComments, setExpandedComments] = useState(new Set());
   const [collapsedColumns, setCollapsedColumns] = useState(new Set());
@@ -700,7 +460,6 @@ function CommentViewer() {
 
   const debouncedSearchQuery = useDebounce(searchQuery, DEBOUNCE_DELAY);
 
-  // Persist username
   useEffect(() => {
     if (currentUsername) {
       try {
@@ -735,7 +494,6 @@ function CommentViewer() {
     if (selection.rangeCount > 0 && !selection.isCollapsed) {
       const range = selection.getRangeAt(0);
       
-      // Check the actual selected elements in the DOM for red color
       let hasRed = false;
       const container = range.commonAncestorContainer;
       
@@ -750,7 +508,6 @@ function CommentViewer() {
         hasRed = computedColor === "rgb(255, 0, 0)" || container.style.color === "red";
       }
       
-      // Also check if selection spans multiple elements with red
       const rangeContainer = document.createElement("div");
       rangeContainer.appendChild(range.cloneContents());
       if (!hasRed) {
@@ -808,7 +565,6 @@ function CommentViewer() {
     }
   }, [history, historyIndex]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleGlobalKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
@@ -829,7 +585,6 @@ function CommentViewer() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [undo, redo]);
 
-  // Office ready
   useEffect(() => {
     Office.onReady((info) => {
       if (info.host === Office.HostType.Word) {
@@ -839,7 +594,6 @@ function CommentViewer() {
     });
   }, []);
 
-  // Auto-save
   useEffect(() => {
     if (!officeReady || comments.length === 0) return;
 
@@ -1247,7 +1001,6 @@ function CommentViewer() {
     URL.revokeObjectURL(url);
   }, [comments]);
 
-  // Column definitions
   const columns = [
     { key: "admin", label: "Admin" },
     { key: "proof", label: "Proof" },
@@ -1256,7 +1009,6 @@ function CommentViewer() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header */}
       <div className="bg-[#0C2340] border-b border-[#1E3A5F] px-3 py-1.5">
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <div className="flex items-center gap-2">
@@ -1264,254 +1016,199 @@ function CommentViewer() {
             <SaveIndicator status={saveStatus} />
           </div>
           <div className="flex gap-1">
-            <button
-              onClick={createNewCommentFromSelection}
-              className="bg-[#C99700] hover:bg-[#B8860B] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
-            >
-              + New
-            </button>
-            <button
-              onClick={loadCommentsFromWord}
-              className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
-            >
-              ↻ Refresh
-            </button>
-            <button
-              onClick={undo}
-              disabled={historyIndex <= 0}
-              className={(historyIndex <= 0 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
-              title="Undo (Ctrl+Z)"
-            >
-              ⎌
-            </button>
-            <button
-              onClick={redo}
-              disabled={historyIndex >= history.length - 1}
-              className={(historyIndex >= history.length - 1 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"}
-              title="Redo (Ctrl+Shift+Z)"
-            >
-              ↷
-            </button>
-            <button
-              onClick={exportComments}
-              className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
-              title="Export to JSON"
-            >
-              ↓
-            </button>
+            <button onClick={createNewCommentFromSelection} className="bg-[#C99700] hover:bg-[#B8860B] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer">+ New</button>
+            <button onClick={loadCommentsFromWord} className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer">↻ Refresh</button>
+            <button onClick={undo} disabled={historyIndex <= 0} className={(historyIndex <= 0 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Undo (Ctrl+Z)">⎌</button>
+            <button onClick={redo} disabled={historyIndex >= history.length - 1} className={(historyIndex >= history.length - 1 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Redo (Ctrl+Shift+Z)">↷</button>
+            <button onClick={exportComments} className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer" title="Export to JSON">↓</button>
           </div>
         </div>
 
-        {/* Formatting toolbar */}
         <div className="flex gap-1 flex-wrap">
-          <button
-            onClick={() => applyFormat("bold")}
-            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded font-bold text-white text-xs transition-colors"
-            title="Bold (Ctrl+B)"
-          >
-            B
-          </button>
-          <button
-            onClick={() => applyFormat("italic")}
-            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded italic text-white text-xs transition-colors"
-            title="Italic (Ctrl+I)"
-          >
-            I
-          </button>
-          <button
-            onClick={toggleHighlight}
-            className="px-2 py-0.5 bg-[#C99700] hover:bg-[#B8860B] border border-[#B8860B] rounded text-white text-xs font-medium transition-colors"
-            title="Toggle Highlight"
-          >
-            H
-          </button>
-          <button
-            onClick={toggleRed}
-            className="px-2 py-0.5 bg-red-500 hover:bg-red-600 border border-red-600 rounded text-white text-xs font-medium transition-colors"
-            title="Toggle Red Text"
-          >
-            R
-          </button>
-          <button
-            onClick={() => applyFormat("removeFormat")}
-            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-red-400 text-xs transition-colors"
-            title="Clear Formatting"
-          >
-            ✕
-          </button>
+          <button onClick={() => applyFormat("bold")} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded font-bold text-white text-xs transition-colors" title="Bold (Ctrl+B)">B</button>
+          <button onClick={() => applyFormat("italic")} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded italic text-white text-xs transition-colors" title="Italic (Ctrl+I)">I</button>
+          <button onClick={toggleHighlight} className="px-2 py-0.5 bg-[#C99700] hover:bg-[#B8860B] border border-[#B8860B] rounded text-white text-xs font-medium transition-colors" title="Toggle Highlight">H</button>
+          <button onClick={toggleRed} className="px-2 py-0.5 bg-red-500 hover:bg-red-600 border border-red-600 rounded text-white text-xs font-medium transition-colors" title="Toggle Red Text">R</button>
+          <button onClick={() => applyFormat("removeFormat")} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-red-400 text-xs transition-colors" title="Clear Formatting">✕</button>
           <div className="border-l border-gray-500 mx-1"></div>
-          <button
-            onClick={expandAll}
-            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs transition-colors"
-            title="Expand All"
-          >
-            ⊞
-          </button>
-          <button
-            onClick={collapseAll}
-            className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs transition-colors"
-            title="Collapse All"
-          >
-            ⊟
-          </button>
+          <button onClick={expandAll} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs transition-colors" title="Expand All">⊞</button>
+          <button onClick={collapseAll} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs transition-colors" title="Collapse All">⊟</button>
         </div>
 
-        {/* Search bar */}
         <div className="mt-1.5 flex gap-2 items-center">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search comments..."
-            className="flex-1 px-2 py-1 text-xs border border-gray-500 rounded bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="text-gray-400 hover:text-white text-xs"
-            >
-              ✕
-            </button>
-          )}
-          {currentUsername && (
-            <div className="text-xs text-gray-300 flex items-center gap-1">
-              <span>👤 {currentUsername}</span>
-              <button
-                onClick={() => setCurrentUsername(null)}
-                className="text-gray-400 hover:text-white"
-                title="Change user"
-              >
-                ✎
-              </button>
-            </div>
-          )}
+          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search comments..." className="flex-1 px-2 py-1 text-xs border border-gray-500 rounded bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400" />
+          {searchQuery && (<button onClick={() => setSearchQuery("")} className="text-gray-400 hover:text-white text-xs">✕</button>)}
+          {currentUsername && (<div className="text-xs text-gray-300 flex items-center gap-1"><span>👤 {currentUsername}</span><button onClick={() => setCurrentUsername(null)} className="text-gray-400 hover:text-white" title="Change user">✎</button></div>)}
         </div>
       </div>
 
-      {/* Username Dialog */}
       {showUsernameDialog && (
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 fade-in">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl border border-gray-200">
             <h2 className="text-lg font-semibold mb-4 text-gray-800">Enter Your Name</h2>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Your name will appear on cells you edit
-              </label>
-              <input
-                type="text"
-                value={tempUsername}
-                onChange={(e) => setTempUsername(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    confirmUsername();
-                  } else if (e.key === "Escape") {
-                    setShowUsernameDialog(false);
-                    pendingEditRef.current = null;
-                    setTempUsername("");
-                  }
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                placeholder="Your name"
-                autoFocus
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your name will appear on cells you edit</label>
+              <input type="text" value={tempUsername} onChange={(e) => setTempUsername(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); confirmUsername(); } else if (e.key === "Escape") { setShowUsernameDialog(false); pendingEditRef.current = null; setTempUsername(""); }}} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent" placeholder="Your name" autoFocus />
             </div>
             <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => {
-                  setShowUsernameDialog(false);
-                  pendingEditRef.current = null;
-                  setTempUsername("");
-                }}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmUsername}
-                className="px-4 py-2 bg-[#C99700] text-white rounded hover:bg-[#B8860B] text-sm font-medium transition-colors"
-              >
-                Confirm
-              </button>
+              <button onClick={() => { setShowUsernameDialog(false); pendingEditRef.current = null; setTempUsername(""); }} className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm transition-colors">Cancel</button>
+              <button onClick={confirmUsername} className="px-4 py-2 bg-[#C99700] text-white rounded hover:bg-[#B8860B] text-sm font-medium transition-colors">Confirm</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Create Comment Dialog */}
       {showCreateDialog && (
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 fade-in">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-gray-200">
             <h2 className="text-lg font-semibold mb-4 text-gray-800">Create New Comment</h2>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Comment ID (e.g., "125A")
-              </label>
-              <input
-                ref={commentIdInputRef}
-                type="text"
-                value={newCommentId}
-                onChange={(e) => setNewCommentId(e.target.value)}
-                onKeyDown={handleDialogKeyDown}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                placeholder="125A"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Comment ID (e.g., "125A")</label>
+              <input ref={commentIdInputRef} type="text" value={newCommentId} onChange={(e) => setNewCommentId(e.target.value)} onKeyDown={handleDialogKeyDown} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent" placeholder="125A" />
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-              <input
-                type="text"
-                value={newCommentLocation}
-                onChange={(e) => setNewCommentLocation(e.target.value)}
-                onKeyDown={handleDialogKeyDown}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-              />
-              <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                💡 A Word comment will appear in the margin. To delete later, just delete the Word comment and click Refresh.
-              </p>
+              <input type="text" value={newCommentLocation} onChange={(e) => setNewCommentLocation(e.target.value)} onKeyDown={handleDialogKeyDown} className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent" />
+              <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">💡 A Word comment will appear in the margin. To delete later, just delete the Word comment and click Refresh.</p>
             </div>
             <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => {
-                  setShowCreateDialog(false);
-                  setNewCommentId("");
-                  setNewCommentLocation("");
-                }}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={finalizeCreateComment}
-                className="px-4 py-2 bg-[#C99700] text-white rounded hover:bg-[#B8860B] text-sm font-medium transition-colors"
-              >
-                Create Comment
-              </button>
+              <button onClick={() => { setShowCreateDialog(false); setNewCommentId(""); setNewCommentLocation(""); }} className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm transition-colors">Cancel</button>
+              <button onClick={finalizeCreateComment} className="px-4 py-2 bg-[#C99700] text-white rounded hover:bg-[#B8860B] text-sm font-medium transition-colors">Create Comment</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
       {deleteConfirm && (
         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 fade-in">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl border border-gray-200">
             <h2 className="text-lg font-semibold mb-4 text-gray-800">Delete Row?</h2>
             <p className="text-sm text-gray-600 mb-4">Are you sure you want to delete this row? This action can be undone.</p>
             <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => deleteRow(deleteConfirm.commentId, deleteConfirm.itemIndex)}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium transition-colors"
-              >
-                Delete
-              </button>
+              <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-sm transition-colors">Cancel</button>
+              <button onClick={() => deleteRow(deleteConfirm.commentId, deleteConfirm.itemIndex)} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium transition-colors">Delete</button>
             </div>
           </div>
         </div>
       )}
+
+      <div className="flex-1 overflow-y-auto p-2">
+        {loading ? (
+          <div className="text-center text-gray-500 mt-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-600 mb-2"></div>
+            <p className="text-sm">Loading comments...</p>
+          </div>
+        ) : comments.length === 0 ? (
+          <div className="text-center text-gray-500 mt-8 bg-white p-6 rounded border border-gray-200 max-w-sm mx-auto">
+            <p className="text-base mb-2">📋 No comments yet</p>
+            <p className="text-xs mb-1">Select some text and click "New Comment" to get started.</p>
+            <p className="text-xs mt-3 text-gray-400">💡 Tip: Delete comments by right-clicking the Word comment in the margin, then click Refresh here.</p>
+          </div>
+        ) : filteredComments.length === 0 ? (
+          <div className="text-center text-gray-500 mt-8">
+            <p>No comments match "{debouncedSearchQuery}"</p>
+            <button onClick={() => setSearchQuery("")} className="mt-2 text-sky-500 hover:text-sky-600 text-sm">Clear search</button>
+          </div>
+        ) : (
+          filteredComments.map((comment) => (
+            <div key={comment.id} id={"comment-" + comment.id} className={"mb-2 bg-white rounded border border-gray-200 shadow-sm" + (expandedComments.has(comment.id) ? " border-l-4 border-[#C99700]" : "")}>
+              <div className="px-1.5 py-0.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-1.5 flex-1 cursor-pointer hover:bg-gray-100 px-1 py-0.5 rounded transition-colors" onClick={() => toggleExpand(comment.id)}>
+                  {expandedComments.has(comment.id) ? <ChevronUp /> : <ChevronDown />}
+                  <div className="text-xs">
+                    <span className="font-semibold text-gray-700 cursor-pointer hover:underline hover:text-[#C99700]" onClick={(e) => { e.stopPropagation(); jumpToComment(comment.id); }}>{comment.id}</span>
+                    <span className="mx-1 text-gray-400">({comment.items.length})</span>
+                    <span className="mx-1 text-gray-400">•</span>
+                    <span className="text-gray-600">{comment.location}</span>
+                  </div>
+                </div>
+              </div>
+
+              {expandedComments.has(comment.id) && (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead className="bg-gray-100 border-b border-gray-300">
+                      <tr>
+                        <th className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r border-gray-200" style={{ minWidth: "40px", width: "40px" }}>#</th>
+                        {columns.map((col) => (
+                          !collapsedColumns.has(col.key) ? (
+                            <th key={col.key} className="px-1.5 py-0.5 text-left font-semibold text-gray-700 border-r border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors" style={{ minWidth: "250px" }} onClick={(e) => { e.stopPropagation(); toggleColumn(col.key); }}>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div>{col.label}</div>
+                                  {(() => {
+                                    const editorKey = "_" + col.key + "Editor";
+                                    const editors = comment.items.map((item) => item[editorKey]).filter(Boolean);
+                                    const lastEditor = editors[editors.length - 1];
+                                    return lastEditor ? (<div className="text-xs font-normal text-gray-500 italic">{lastEditor}</div>) : null;
+                                  })()}
+                                </div>
+                                <ChevronUp />
+                              </div>
+                            </th>
+                          ) : null
+                        ))}
+                        {collapsedColumns.size > 0 && (
+                          <th className="px-1 py-1 text-center font-semibold text-gray-500 border-r border-gray-200">
+                            <div className="flex flex-col gap-0.5">
+                              {Array.from(collapsedColumns).map((col) => (
+                                <button key={col} onClick={(e) => { e.stopPropagation(); toggleColumn(col); }} className="px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded text-xs flex items-center gap-1 transition-colors">
+                                  <ChevronDown /> {col.charAt(0).toUpperCase() + col.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </th>
+                        )}
+                        <th className="px-1 py-1 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comment.items.map((item, idx) => {
+                        const rowBgClass = item.isHeading ? "bg-[#FEF9C3]" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50");
+                        return (
+                        <tr key={idx} className={`group ${rowBgClass} transition-colors`}>
+                          <td className="px-1 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "40px", width: "40px" }}>
+                            <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, "id", e.target.value)} className={"w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs" + (item.isHeading ? " font-bold" : "")} placeholder="#" />
+                          </td>
+                          {columns.map((col) => (
+                            !collapsedColumns.has(col.key) ? (
+                              <td key={col.key} className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}>
+                                <button onClick={(e) => { e.stopPropagation(); toggleCellImplemented(comment.id, idx, col.key); }} className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")} style={{ zIndex: 20, cursor: "pointer" }} title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
+                                <div className={item.isHeading ? "font-semibold" : ""}>
+                                  <MemoizedRichTextCell value={item[col.key]} onChange={(html) => updateCell(comment.id, idx, col.key, html)} placeholder="—" column={col.key} commentId={comment.id} itemIndex={idx} addRowAfter={addRowAfter} />
+                                </div>
+                              </td>
+                            ) : null
+                          ))}
+                          {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
+                          <td className="px-1 py-0 align-top">
+                            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col gap-0 py-0.5">
+                              <button onClick={() => addRowAfter(comment.id, idx)} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors" title="Add row below">+</button>
+                              <button onClick={() => toggleHeading(comment.id, idx)} className={"w-5 h-4 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-[#C99700] text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")} title="Toggle heading">H</button>
+                              <button onClick={() => setDeleteConfirm({ commentId: comment.id, itemIndex: idx })} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors" title="Delete row">×</button>
+                            </div>
+                          </td>
+                        </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
+        <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
+        <span>v47</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<CommentViewer />);
+</script>
+</body>
+</html>
