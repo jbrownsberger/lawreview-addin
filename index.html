@@ -332,17 +332,10 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       
       let plainText = container.textContent.replace(/°/g, '\u00A0');
       
-      console.log("=== COPY DEBUG ===");
-      console.log("Plain text:", plainText);
-      console.log("HTML:", container.innerHTML);
-      console.log("RTF:", rtfDocument);
-      
+      // Only set plain text and RTF - NO HTML
       e.clipboardData.setData("text/plain", plainText);
-      e.clipboardData.setData("text/html", container.innerHTML);
       e.clipboardData.setData("text/rtf", rtfDocument);
       e.preventDefault();
-      
-      console.log("Clipboard data set successfully");
     }
   }, []);
 
@@ -550,9 +543,9 @@ function CommentViewer() {
         
         let plainText = container.textContent.replace(/°/g, '\u00A0');
         
+        // Only set plain text and RTF - NO HTML to avoid Word's unwanted nbsp
         e.clipboardData.setData("text/plain", plainText);
         e.clipboardData.setData("text/rtf", rtfDocument);
-        e.clipboardData.setData("text/html", container.innerHTML);
         e.preventDefault();
       }
     };
