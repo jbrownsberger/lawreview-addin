@@ -287,61 +287,62 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         text = text.replace(/___DEGREE_NBSP___/g, '\\~');
         return text;
       };
+      
       const convertToRTF = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
           return escapeRTFText(node.textContent);
         }
-      
+        
         if (node.nodeType === Node.ELEMENT_NODE) {
           const tagName = node.tagName.toLowerCase();
           const style = node.style;
           const computedStyle = window.getComputedStyle(node);
-      
-          const weight = computedStyle.fontWeight;
-          const isBold =
-            tagName === "b" ||
-            tagName === "strong" ||
-            (!isNaN(weight) && parseInt(weight, 10) >= 600);
-      
-          const isItalic =
-            tagName === "i" ||
-            tagName === "em" ||
+          
+          const isBold = tagName === "b" || tagName === "strong" ||
+            style.fontWeight === "bold" || style.fontWeight === "700" ||
+            computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700";
+          const isItalic = tagName === "i" || tagName === "em" ||
+            style.fontStyle === "italic" ||
             computedStyle.fontStyle === "italic";
-      
+          
           let childRTF = "";
           for (const child of node.childNodes) {
             childRTF += convertToRTF(child);
           }
-      
-          // IMPORTANT: group formatting with braces
-          if (isBold && isItalic) {
-            return `{\\b\\i ${childRTF}}`;
+          
+          let result = childRTF;
+          if (isItalic) {
+            result = "{\\i " + result + "}";
           }
           if (isBold) {
-            return `{\\b ${childRTF}}`;
+            result = "{\\b " + result + "}";
           }
-          if (isItalic) {
-            return `{\\i ${childRTF}}`;
-          }
-      
-          return childRTF;
+          
+          return result;
         }
-      
+        
         return "";
       };
       
       const contentRTF = convertToRTF(container);
       
-      // More complete RTF document structure with proper font table
       const rtfDocument = "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat{\\fonttbl{\\f0\\fnil\\fcharset0 Georgia;}}" +
         "{\\colortbl ;\\red0\\green0\\blue0;}" +
         "\\viewkind4\\uc1\\pard\\f0\\fs24 " + contentRTF + "}";
       
       let plainText = container.textContent.replace(/°/g, '\u00A0');
       
+      console.log("=== COPY DEBUG ===");
+      console.log("Plain text:", plainText);
+      console.log("HTML:", container.innerHTML);
+      console.log("RTF:", rtfDocument);
+      
       e.clipboardData.setData("text/plain", plainText);
+      e.clipboardData.setData("text/html", container.innerHTML);
       e.clipboardData.setData("text/rtf", rtfDocument);
       e.preventDefault();
+      
+      console.log("Clipboard data set successfully");
     }
   }, []);
 
@@ -480,6 +481,85 @@ function CommentViewer() {
       }
     }
   }, [currentUsername]);
+
+  // Global copy handler for formatting preservation
+  useEffect(() => {
+    const handleGlobalCopy = (e) => {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0 && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        const container = document.createElement("div");
+        container.appendChild(range.cloneContents());
+
+        // Remove background styling
+        container.querySelectorAll('[style*="background"]').forEach((el) => {
+          el.style.backgroundColor = "";
+          el.style.background = "";
+        });
+        
+        const escapeRTFText = (text) => {
+          text = text.replace(/°/g, '___DEGREE_NBSP___');
+          text = text.replace(/\\/g, '\\\\');
+          text = text.replace(/\{/g, '\\{');
+          text = text.replace(/\}/g, '\\}');
+          text = text.replace(/___DEGREE_NBSP___/g, '\\~');
+          return text;
+        };
+        
+        const convertToRTF = (node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            return escapeRTFText(node.textContent);
+          }
+          
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName.toLowerCase();
+            const style = node.style;
+            const computedStyle = window.getComputedStyle(node);
+            
+            const isBold = tagName === "b" || tagName === "strong" ||
+              style.fontWeight === "bold" || style.fontWeight === "700" ||
+              computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700";
+            const isItalic = tagName === "i" || tagName === "em" ||
+              style.fontStyle === "italic" ||
+              computedStyle.fontStyle === "italic";
+            
+            let childRTF = "";
+            for (const child of node.childNodes) {
+              childRTF += convertToRTF(child);
+            }
+            
+            let result = childRTF;
+            if (isItalic) {
+              result = "{\\i " + result + "}";
+            }
+            if (isBold) {
+              result = "{\\b " + result + "}";
+            }
+            
+            return result;
+          }
+          
+          return "";
+        };
+        
+        const contentRTF = convertToRTF(container);
+        
+        const rtfDocument = "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat{\\fonttbl{\\f0\\fnil\\fcharset0 Georgia;}}" +
+          "{\\colortbl ;\\red0\\green0\\blue0;}" +
+          "\\viewkind4\\uc1\\pard\\f0\\fs24 " + contentRTF + "}";
+        
+        let plainText = container.textContent.replace(/°/g, '\u00A0');
+        
+        e.clipboardData.setData("text/plain", plainText);
+        e.clipboardData.setData("text/rtf", rtfDocument);
+        e.clipboardData.setData("text/html", container.innerHTML);
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("copy", handleGlobalCopy);
+    return () => document.removeEventListener("copy", handleGlobalCopy);
+  }, []);
 
   const applyFormat = useCallback((command) => {
     document.execCommand(command, false, null);
