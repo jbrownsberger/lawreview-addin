@@ -268,11 +268,16 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   }, []);
 
   const handleCopy = useCallback((e) => {
+    console.log("=== COPY EVENT FIRED ===");
     const selection = window.getSelection();
+    console.log("Selection range count:", selection.rangeCount);
+    
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const container = document.createElement("div");
       container.appendChild(range.cloneContents());
+
+      console.log("Container HTML:", container.innerHTML);
 
       container.querySelectorAll('[style*="background"]').forEach((el) => {
         el.style.backgroundColor = "";
@@ -288,9 +293,13 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         return text;
       };
       
-      const convertToRTF = (node) => {
+      const convertToRTF = (node, depth = 0) => {
+        const indent = "  ".repeat(depth);
+        
         if (node.nodeType === Node.TEXT_NODE) {
-          return escapeRTFText(node.textContent);
+          const escaped = escapeRTFText(node.textContent);
+          console.log(indent + "TEXT:", node.textContent, "->", escaped);
+          return escaped;
         }
         
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -305,17 +314,21 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             style.fontStyle === "italic" ||
             computedStyle.fontStyle === "italic";
           
+          console.log(indent + "ELEMENT:", tagName, "bold:", isBold, "italic:", isItalic);
+          
           let childRTF = "";
           for (const child of node.childNodes) {
-            childRTF += convertToRTF(child);
+            childRTF += convertToRTF(child, depth + 1);
           }
           
           let result = childRTF;
           if (isItalic) {
             result = "{\\i " + result + "}";
+            console.log(indent + "Wrapped in italic");
           }
           if (isBold) {
             result = "{\\b " + result + "}";
+            console.log(indent + "Wrapped in bold");
           }
           
           return result;
@@ -324,18 +337,39 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         return "";
       };
       
+      console.log("=== CONVERTING TO RTF ===");
       const contentRTF = convertToRTF(container);
+      console.log("Content RTF:", contentRTF);
       
       const rtfDocument = "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat{\\fonttbl{\\f0\\fnil\\fcharset0 Georgia;}}" +
         "{\\colortbl ;\\red0\\green0\\blue0;}" +
         "\\viewkind4\\uc1\\pard\\f0\\fs24 " + contentRTF + "}";
       
-      let plainText = container.textContent.replace(/°/g, '\u00A0');
+      console.log("=== FULL RTF DOCUMENT ===");
+      console.log(rtfDocument);
       
-      // Only set plain text and RTF - NO HTML
-      e.clipboardData.setData("text/plain", plainText);
-      e.clipboardData.setData("text/rtf", rtfDocument);
+      let plainText = container.textContent.replace(/°/g, '\u00A0');
+      console.log("Plain text:", plainText);
+      
+      // Test: Can we set clipboard data?
+      try {
+        e.clipboardData.setData("text/plain", plainText);
+        console.log("✓ Set text/plain");
+      } catch (err) {
+        console.error("✗ Failed to set text/plain:", err);
+      }
+      
+      try {
+        e.clipboardData.setData("text/rtf", rtfDocument);
+        console.log("✓ Set text/rtf");
+      } catch (err) {
+        console.error("✗ Failed to set text/rtf:", err);
+      }
+      
       e.preventDefault();
+      console.log("=== COPY COMPLETE ===");
+    } else {
+      console.log("No selection!");
     }
   }, []);
 
