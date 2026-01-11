@@ -284,16 +284,11 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      // Create a clean version for Word with inline styles
-      const cleanHTML = document.createElement("div");
-      cleanHTML.style.fontFamily = "Georgia, serif";
-      cleanHTML.style.fontSize = "12pt";
-      
-      const processNodeForHTML = (node) => {
+      // Build Word-specific HTML fragment
+      const processNodeForWord = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          // Convert degree symbols to regular nbsp in HTML
-          const text = node.textContent.replace(/°/g, '\u00A0');
-          return document.createTextNode(text);
+          // Convert degree symbols to nbsp
+          return node.textContent.replace(/°/g, '\u00A0');
         }
         
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -308,39 +303,56 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             style.fontStyle === "italic" ||
             computedStyle.fontStyle === "italic";
           
-          const children = Array.from(node.childNodes).map(processNodeForHTML);
+          let childHTML = "";
+          for (const child of node.childNodes) {
+            childHTML += processNodeForWord(child);
+          }
           
-          // Use span with inline styles instead of semantic tags
-          if (isBold || isItalic) {
-            const span = document.createElement("span");
-            span.style.fontFamily = "Georgia, serif";
-            span.style.fontSize = "12pt";
-            if (isBold) span.style.fontWeight = "bold";
-            if (isItalic) span.style.fontStyle = "italic";
-            children.forEach(child => span.appendChild(child));
-            return span;
+          // Use Word's native formatting tags
+          if (isBold && isItalic) {
+            return '<b><i>' + childHTML + '</i></b>';
+          } else if (isBold) {
+            return '<b>' + childHTML + '</b>';
+          } else if (isItalic) {
+            return '<i>' + childHTML + '</i>';
           } else {
-            const fragment = document.createDocumentFragment();
-            children.forEach(child => fragment.appendChild(child));
-            return fragment;
+            return childHTML;
           }
         }
         
-        return document.createTextNode("");
+        return "";
       };
       
-      Array.from(container.childNodes).forEach(node => {
-        cleanHTML.appendChild(processNodeForHTML(node));
-      });
+      const contentHTML = processNodeForWord(container);
       
-      console.log("Clean HTML:", cleanHTML.innerHTML);
+      // Create Word-compatible HTML with proper meta tags and font specification
+      const wordHTML = 
+        '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">' +
+        '<head>' +
+        '<meta charset="utf-8">' +
+        '<meta name="ProgId" content="Word.Document">' +
+        '<meta name="Generator" content="Microsoft Word">' +
+        '<meta name="Originator" content="Microsoft Word">' +
+        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]-->' +
+        '<style>' +
+        'body { font-family: Georgia, serif; font-size: 12pt; }' +
+        'b { font-weight: bold; }' +
+        'i { font-style: italic; }' +
+        '</style>' +
+        '</head>' +
+        '<body>' +
+        '<p style="margin: 0; font-family: Georgia, serif; font-size: 12pt;">' + contentHTML + '</p>' +
+        '</body>' +
+        '</html>';
+      
+      console.log("Word HTML:", wordHTML);
       
       let plainText = container.textContent.replace(/°/g, '\u00A0');
       console.log("Plain text:", plainText);
       
-      // Set both plain text and clean HTML with inline styles
+      // Set both formats
       e.clipboardData.setData("text/plain", plainText);
-      e.clipboardData.setData("text/html", cleanHTML.outerHTML);
+      e.clipboardData.setData("text/html", wordHTML);
       e.preventDefault();
       
       console.log("=== COPY COMPLETE ===");
