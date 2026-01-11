@@ -284,11 +284,14 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      // Build Word-specific HTML fragment
+      // Build Word-specific HTML using only spans with mso styles
       const processNodeForWord = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          // Convert degree symbols to nbsp
-          return node.textContent.replace(/°/g, '\u00A0');
+          // Convert degree symbols to nbsp and escape HTML
+          return node.textContent.replace(/°/g, '\u00A0')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
         }
         
         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -308,13 +311,12 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             childHTML += processNodeForWord(child);
           }
           
-          // Use Word's native formatting tags
-          if (isBold && isItalic) {
-            return '<b><i>' + childHTML + '</i></b>';
-          } else if (isBold) {
-            return '<b>' + childHTML + '</b>';
-          } else if (isItalic) {
-            return '<i>' + childHTML + '</i>';
+          // Use Word's mso-style formatting in spans only
+          if (isBold || isItalic) {
+            let styleStr = 'font-family:Georgia;font-size:12.0pt;';
+            if (isBold) styleStr += 'font-weight:bold;';
+            if (isItalic) styleStr += 'font-style:italic;';
+            return '<span style="' + styleStr + '">' + childHTML + '</span>';
           } else {
             return childHTML;
           }
@@ -325,23 +327,12 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       
       const contentHTML = processNodeForWord(container);
       
-      // Create Word-compatible HTML with proper meta tags and font specification
+      // Minimal Word HTML - just the formatted fragment
       const wordHTML = 
         '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">' +
-        '<head>' +
-        '<meta charset="utf-8">' +
-        '<meta name="ProgId" content="Word.Document">' +
-        '<meta name="Generator" content="Microsoft Word">' +
-        '<meta name="Originator" content="Microsoft Word">' +
-        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]-->' +
-        '<style>' +
-        'body { font-family: Georgia, serif; font-size: 12pt; }' +
-        'b { font-weight: bold; }' +
-        'i { font-style: italic; }' +
-        '</style>' +
-        '</head>' +
+        '<head><meta charset="utf-8"></head>' +
         '<body>' +
-        '<p style="margin: 0; font-family: Georgia, serif; font-size: 12pt;">' + contentHTML + '</p>' +
+        '<span style="font-family:Georgia;font-size:12.0pt;">' + contentHTML + '</span>' +
         '</body>' +
         '</html>';
       
