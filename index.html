@@ -284,10 +284,10 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      // Build Word-specific HTML using only spans with mso styles
+      // Build plain runs without any wrapper elements
       const processNodeForWord = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          // Convert degree symbols to nbsp and escape HTML
+          // Convert degree symbols to nbsp
           return node.textContent.replace(/°/g, '\u00A0')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -311,12 +311,14 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             childHTML += processNodeForWord(child);
           }
           
-          // Use Word's mso-style formatting in spans only
+          // Build font tag with face and style attributes (old-school HTML)
           if (isBold || isItalic) {
-            let styleStr = 'font-family:Georgia;font-size:12.0pt;';
-            if (isBold) styleStr += 'font-weight:bold;';
-            if (isItalic) styleStr += 'font-style:italic;';
-            return '<span style="' + styleStr + '">' + childHTML + '</span>';
+            let styleAttr = '';
+            if (isBold && isItalic) styleAttr = 'font-weight:bold;font-style:italic';
+            else if (isBold) styleAttr = 'font-weight:bold';
+            else if (isItalic) styleAttr = 'font-style:italic';
+            
+            return '<font face="Georgia" size="3" style="' + styleAttr + '">' + childHTML + '</font>';
           } else {
             return childHTML;
           }
@@ -327,12 +329,22 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       
       const contentHTML = processNodeForWord(container);
       
-      // Minimal Word HTML - just the formatted fragment
+      // Use Word's fragment format with StartFragment/EndFragment markers
+      const fragmentStart = '<!--StartFragment-->';
+      const fragmentEnd = '<!--EndFragment-->';
+      
       const wordHTML = 
-        '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">' +
-        '<head><meta charset="utf-8"></head>' +
-        '<body>' +
-        '<span style="font-family:Georgia;font-size:12.0pt;">' + contentHTML + '</span>' +
+        '<html>' +
+        '<head>' +
+        '<meta charset="utf-8">' +
+        '<style><!-- /* Font Definitions */ @font-face {font-family:Georgia;} --></style>' +
+        '</head>' +
+        '<body lang="EN-US" style="word-wrap:break-word">' +
+        '<div>' +
+        fragmentStart +
+        '<font face="Georgia" size="3">' + contentHTML + '</font>' +
+        fragmentEnd +
+        '</div>' +
         '</body>' +
         '</html>';
       
