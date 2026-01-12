@@ -268,334 +268,15 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   }, []);
 
   const handleCopy = useCallback((e) => {
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const container = document.createElement("div");
-      container.appendChild(range.cloneContents());
-
-      container.querySelectorAll('[style*="background"]').forEach((el) => {
-        el.style.backgroundColor = "";
-        el.style.background = "";
-      });
-      
-      const processNodeForWord = (node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          return node.textContent
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        }
-        
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const tagName = node.tagName.toLowerCase();
-          const style = node.style;
-          const computedStyle = window.getComputedStyle(node);
-          
-          const isBold = tagName === "b" || tagName === "strong" ||
-            style.fontWeight === "bold" || style.fontWeight === "700" ||
-            computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700";
-          const isItalic = tagName === "i" || tagName === "em" ||
-            style.fontStyle === "italic" ||
-            computedStyle.fontStyle === "italic";
-          
-          let childHTML = "";
-          for (const child of node.childNodes) {
-            childHTML += processNodeForWord(child);
-          }
-          
-          if (isBold || isItalic) {
-            let styleAttr = '';
-            if (isBold && isItalic) styleAttr = 'font-weight:bold;font-style:italic';
-            else if (isBold) styleAttr = 'font-weight:bold';
-            else if (isItalic) styleAttr = 'font-style:italic';
-            
-            return '<font face="Georgia" size="3" style="' + styleAttr + '">' + childHTML + '</font>';
-          } else {
-            return childHTML;
-          }
-        }
-        
-        return "";
-      };
-      
-      const contentHTML = processNodeForWord(container);
-      
-      const wordHTML = 
-        '<html>' +
-        '<head><meta charset="utf-8"></head>' +
-        '<body>' +
-        '<font face="Georgia" size="3">' + contentHTML + '</font>' +
-        '</body>' +
-        '</html>';
-      
-      let plainText = container.textContent;
-      
-      e.clipboardData.setData("text/plain", plainText);
-      e.clipboardData.setData("text/html", wordHTML);
-      e.preventDefault();
-    }
-  }, []);
-
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === ' ' && (e.altKey || (e.ctrlKey && e.shiftKey))) {
-      e.preventDefault();
-      document.execCommand("insertText", false, "°");
-      return;
-    }
-
-    if ((e.metaKey || e.ctrlKey) && e.key === "b") {
-      e.preventDefault();
-      document.execCommand("bold", false, null);
-      return;
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === "i") {
-      e.preventDefault();
-      document.execCommand("italic", false, null);
-      return;
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === "u") {
-      e.preventDefault();
-      document.execCommand("underline", false, null);
-      return;
-    }
-
-    if (e.shiftKey && e.key === "Enter") {
-      e.preventDefault();
-      if (addRowAfter && commentId && itemIndex !== undefined) {
-        addRowAfter(commentId, itemIndex);
-        setTimeout(() => {
-          const allCells = Array.from(document.querySelectorAll('[data-cell-column="' + column + '"]'));
-          const currentIndex = allCells.indexOf(editorRef.current);
-          const nextCell = allCells[currentIndex + 1];
-          if (nextCell) {
-            nextCell.focus();
-            const range = document.createRange();
-            const sel = window.getSelection();
-            if (nextCell.childNodes.length > 0) {
-              range.setStart(nextCell, 0);
-              range.collapse(true);
-              sel.removeAllRanges();
-              sel.addRange(range);
-            }
-          }
-        }, 50);
-      }
-      return;
-    }
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const allCells = Array.from(document.querySelectorAll('[data-cell-column="' + column + '"]'));
-      const currentIndex = allCells.indexOf(editorRef.current);
-      const nextIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
-
-      if (nextIndex >= 0 && nextIndex < allCells.length) {
-        const nextCell = allCells[nextIndex];
-        nextCell.focus();
-        const range = document.createRange();
-        const sel = window.getSelection();
-        if (nextCell.childNodes.length > 0) {
-          range.selectNodeContents(nextCell);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      }
-    }
-  }, [column, addRowAfter, commentId, itemIndex]);
-
-  return (
-    <div className="relative w-full" style={{ paddingRight: "20px" }}>
-      <div
-        ref={editorRef}
-        contentEditable
-        onInput={handleInput}
-        onPaste={handlePaste}
-        onCopy={handleCopy}
-        onKeyDown={handleKeyDown}
-        data-cell-column={column}
-        className="w-full min-h-[1.4rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-1 py-0.5 cursor-text leading-tight"
-        style={{
-          wordWrap: "break-word",
-          whiteSpace: "pre-wrap",
-          fontFamily: "Georgia, serif",
-          fontSize: "12pt"
-        }}
-        suppressContentEditableWarning
-      />
-      {!value && (
-        <div className="absolute top-0.5 left-1 text-gray-400 pointer-events-none select-none italic" style={{ fontFamily: "Georgia, serif", fontSize: "12pt" }}>
-          {placeholder}
-        </div>
-      )}
-    </div>
-  );
-}
-  const editorRef = useRef(null);
-  const isUpdatingRef = useRef(false);
-
-  useEffect(() => {
-    if (editorRef.current && !editorRef.current.innerHTML) {
-      editorRef.current.innerHTML = value || "";
-    }
-  }, [value]);
-
-  useEffect(() => {
-    if (editorRef.current && !isUpdatingRef.current && document.activeElement !== editorRef.current) {
-      if (editorRef.current.innerHTML !== value && value !== undefined) {
-        editorRef.current.innerHTML = value || "";
-      }
-    }
-  }, [value]);
-
-  const handleInput = useCallback((e) => {
-    isUpdatingRef.current = true;
-    let rawHtml = e.target.innerHTML;
-    
-    const hasNbsp = /\u00A0|&nbsp;/i.test(rawHtml);
-    
-    if (hasNbsp) {
-      const sel = window.getSelection();
-      let cursorOffset = 0;
-      
-      if (sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0);
-        const preCaretRange = range.cloneRange();
-        preCaretRange.selectNodeContents(e.target);
-        preCaretRange.setEnd(range.startContainer, range.startOffset);
-        cursorOffset = preCaretRange.toString().length;
-      }
-      
-      rawHtml = rawHtml.replace(/\u00A0/g, '°');
-      rawHtml = rawHtml.replace(/&nbsp;/gi, '°');
-      e.target.innerHTML = rawHtml;
-      
-      if (sel.rangeCount > 0) {
-        const newRange = document.createRange();
-        let charCount = 0;
-        let found = false;
-        
-        const walkNodes = (node) => {
-          if (found) return;
-          if (node.nodeType === Node.TEXT_NODE) {
-            const nextCount = charCount + node.textContent.length;
-            if (cursorOffset <= nextCount) {
-              newRange.setStart(node, cursorOffset - charCount);
-              newRange.collapse(true);
-              found = true;
-            }
-            charCount = nextCount;
-          } else {
-            for (const child of node.childNodes) {
-              walkNodes(child);
-              if (found) return;
-            }
-          }
-        };
-        
-        walkNodes(e.target);
-        
-        if (found) {
-          sel.removeAllRanges();
-          sel.addRange(newRange);
-        }
-      }
-    }
-    
-    onChange(rawHtml);
-    isUpdatingRef.current = false;
-  }, [onChange]);
-
-  const handlePaste = useCallback((e) => {
-    e.preventDefault();
-    const html = e.clipboardData.getData("text/html");
-
-    if (html) {
-      const temp = document.createElement("div");
-      temp.innerHTML = html;
-
-      const processNode = (node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const text = node.textContent.replace(/\u00A0/g, '°');
-          return document.createTextNode(text);
-        }
-
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const tagName = node.tagName.toLowerCase();
-          const style = node.style;
-          const styleAttr = node.getAttribute("style") || "";
-          
-          const isBold = tagName === "b" || tagName === "strong" ||
-            style.fontWeight === "bold" || style.fontWeight === "700" ||
-            styleAttr.includes("font-weight: bold") || styleAttr.includes("font-weight:bold");
-          const isItalic = tagName === "i" || tagName === "em" ||
-            style.fontStyle === "italic" ||
-            styleAttr.includes("font-style: italic") || styleAttr.includes("font-style:italic");
-
-          const children = Array.from(node.childNodes).map(processNode);
-
-          let resultElement = null;
-          
-          if (isItalic) {
-            const em = document.createElement("em");
-            children.forEach((child) => em.appendChild(child));
-            resultElement = em;
-          }
-          
-          if (isBold) {
-            const strong = document.createElement("strong");
-            if (resultElement) {
-              strong.appendChild(resultElement);
-            } else {
-              children.forEach((child) => strong.appendChild(child));
-            }
-            resultElement = strong;
-          }
-          
-          if (resultElement) {
-            return resultElement;
-          } else {
-            const fragment = document.createDocumentFragment();
-            children.forEach((child) => fragment.appendChild(child));
-            return fragment;
-          }
-        }
-
-        return document.createTextNode("");
-      };
-
-      const processed = document.createDocumentFragment();
-      Array.from(temp.childNodes).forEach((node) => {
-        processed.appendChild(processNode(node));
-      });
-
-      const selection = window.getSelection();
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        range.deleteContents();
-        range.insertNode(processed);
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-      
-      if (editorRef.current) {
-        editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    } else {
-      const text = e.clipboardData.getData("text/plain");
-      const convertedText = text.replace(/\u00A0/g, '°');
-      document.execCommand("insertText", false, convertedText);
-    }
-  }, []);
-
-  const handleCopy = useCallback((e) => {
+    console.log("=== COPY EVENT FIRED ===");
     const selection = window.getSelection();
     
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       const container = document.createElement("div");
       container.appendChild(range.cloneContents());
+
+      console.log("Original HTML:", container.innerHTML);
 
       // Remove background styling
       container.querySelectorAll('[style*="background"]').forEach((el) => {
@@ -603,11 +284,11 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         el.style.background = "";
       });
       
-      // Build Word HTML - keep degree symbols as-is, they'll be converted by Clean Paste
+      // Build Word-specific HTML using only spans with mso styles
       const processNodeForWord = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          // DON'T convert degree symbols yet - leave them for post-processing
-          return node.textContent
+          // Convert degree symbols to nbsp and escape HTML
+          return node.textContent.replace(/°/g, '\u00A0')
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
@@ -630,13 +311,12 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             childHTML += processNodeForWord(child);
           }
           
+          // Use Word's mso-style formatting in spans only
           if (isBold || isItalic) {
-            let styleAttr = '';
-            if (isBold && isItalic) styleAttr = 'font-weight:bold;font-style:italic';
-            else if (isBold) styleAttr = 'font-weight:bold';
-            else if (isItalic) styleAttr = 'font-style:italic';
-            
-            return '<font face="Georgia" size="3" style="' + styleAttr + '">' + childHTML + '</font>';
+            let styleStr = 'font-family:Georgia;font-size:12.0pt;';
+            if (isBold) styleStr += 'font-weight:bold;';
+            if (isItalic) styleStr += 'font-style:italic;';
+            return '<span style="' + styleStr + '">' + childHTML + '</span>';
           } else {
             return childHTML;
           }
@@ -647,54 +327,28 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       
       const contentHTML = processNodeForWord(container);
       
+      // Minimal Word HTML - just the formatted fragment
       const wordHTML = 
-        '<html>' +
+        '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">' +
         '<head><meta charset="utf-8"></head>' +
         '<body>' +
-        '<font face="Georgia" size="3">' + contentHTML + '</font>' +
+        '<span style="font-family:Georgia;font-size:12.0pt;">' + contentHTML + '</span>' +
         '</body>' +
         '</html>';
       
-      // Plain text also keeps degree symbols
-      let plainText = container.textContent;
+      console.log("Word HTML:", wordHTML);
       
+      let plainText = container.textContent.replace(/°/g, '\u00A0');
+      console.log("Plain text:", plainText);
+      
+      // Set both formats
       e.clipboardData.setData("text/plain", plainText);
       e.clipboardData.setData("text/html", wordHTML);
       e.preventDefault();
+      
+      console.log("=== COPY COMPLETE ===");
     }
   }, []);
-
-  const cleanPaste = useCallback(async () => {
-    if (!officeReady) {
-      alert("Office is not ready");
-      return;
-    }
-
-    try {
-      await Word.run(async (context) => {
-        const selection = context.document.getSelection();
-        selection.load("text");
-        await context.sync();
-
-        // Get the text and clean it
-        let cleanedText = selection.text;
-        
-        // Step 1: Remove all nbsp (these are the unwanted ones from formatting)
-        cleanedText = cleanedText.replace(/\u00A0/g, '');
-        
-        // Step 2: Convert degree symbols to nbsp (these are the wanted ones)
-        cleanedText = cleanedText.replace(/°/g, '\u00A0');
-        
-        // Replace the selection with cleaned text
-        selection.insertText(cleanedText, Word.InsertLocation.replace);
-        
-        await context.sync();
-      });
-    } catch (error) {
-      console.error("Error cleaning paste:", error);
-      alert("Error cleaning text: " + error.message);
-    }
-  }, [officeReady]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === ' ' && (e.altKey || (e.ctrlKey && e.shiftKey))) {
@@ -847,13 +501,18 @@ function CommentViewer() {
           el.style.background = "";
         });
         
-        // Build Word HTML - keep degree symbols as-is
-        const processNodeForWord = (node) => {
+        const escapeRTFText = (text) => {
+          text = text.replace(/°/g, '___DEGREE_NBSP___');
+          text = text.replace(/\\/g, '\\\\');
+          text = text.replace(/\{/g, '\\{');
+          text = text.replace(/\}/g, '\\}');
+          text = text.replace(/___DEGREE_NBSP___/g, '\\~');
+          return text;
+        };
+        
+        const convertToRTF = (node) => {
           if (node.nodeType === Node.TEXT_NODE) {
-            return node.textContent
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;');
+            return escapeRTFText(node.textContent);
           }
           
           if (node.nodeType === Node.ELEMENT_NODE) {
@@ -868,40 +527,36 @@ function CommentViewer() {
               style.fontStyle === "italic" ||
               computedStyle.fontStyle === "italic";
             
-            let childHTML = "";
+            let childRTF = "";
             for (const child of node.childNodes) {
-              childHTML += processNodeForWord(child);
+              childRTF += convertToRTF(child);
             }
             
-            if (isBold || isItalic) {
-              let styleAttr = '';
-              if (isBold && isItalic) styleAttr = 'font-weight:bold;font-style:italic';
-              else if (isBold) styleAttr = 'font-weight:bold';
-              else if (isItalic) styleAttr = 'font-style:italic';
-              
-              return '<font face="Georgia" size="3" style="' + styleAttr + '">' + childHTML + '</font>';
-            } else {
-              return childHTML;
+            let result = childRTF;
+            if (isItalic) {
+              result = "{\\i " + result + "}";
             }
+            if (isBold) {
+              result = "{\\b " + result + "}";
+            }
+            
+            return result;
           }
           
           return "";
         };
         
-        const contentHTML = processNodeForWord(container);
+        const contentRTF = convertToRTF(container);
         
-        const wordHTML = 
-          '<html>' +
-          '<head><meta charset="utf-8"></head>' +
-          '<body>' +
-          '<font face="Georgia" size="3">' + contentHTML + '</font>' +
-          '</body>' +
-          '</html>';
+        const rtfDocument = "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat{\\fonttbl{\\f0\\fnil\\fcharset0 Georgia;}}" +
+          "{\\colortbl ;\\red0\\green0\\blue0;}" +
+          "\\viewkind4\\uc1\\pard\\f0\\fs24 " + contentRTF + "}";
         
-        let plainText = container.textContent;
+        let plainText = container.textContent.replace(/°/g, '\u00A0');
         
+        // Only set plain text and RTF - NO HTML to avoid Word's unwanted nbsp
         e.clipboardData.setData("text/plain", plainText);
-        e.clipboardData.setData("text/html", wordHTML);
+        e.clipboardData.setData("text/rtf", rtfDocument);
         e.preventDefault();
       }
     };
@@ -909,64 +564,6 @@ function CommentViewer() {
     document.addEventListener("copy", handleGlobalCopy);
     return () => document.removeEventListener("copy", handleGlobalCopy);
   }, []);
-
-  const cleanPaste = useCallback(async () => {
-    if (!officeReady) {
-      alert("Office is not ready");
-      return;
-    }
-
-    try {
-      await Word.run(async (context) => {
-        const selection = context.document.getSelection();
-        selection.load("text");
-        await context.sync();
-
-        let cleanedText = selection.text;
-        cleanedText = cleanedText.replace(/\u00A0/g, '');
-        cleanedText = cleanedText.replace(/°/g, '\u00A0');
-        
-        selection.insertText(cleanedText, Word.InsertLocation.replace);
-        await context.sync();
-      });
-    } catch (error) {
-      console.error("Error cleaning paste:", error);
-      alert("Error cleaning text: " + error.message);
-    }
-  }, [officeReady]);
-
-  const smartPasteFromClipboard = useCallback(async () => {
-    if (!officeReady) {
-      alert("Office is not ready");
-      return;
-    }
-
-    // Get clipboard text
-    try {
-      const clipboardText = await navigator.clipboard.readText();
-      
-      await Word.run(async (context) => {
-        const selection = context.document.getSelection();
-        
-        // Parse the stored HTML from our copy operation
-        // For now, just insert the plain text with proper nbsp conversion
-        const processedText = clipboardText.replace(/°/g, '\u00A0');
-        
-        selection.insertText(processedText, Word.InsertLocation.replace);
-        
-        // Apply Georgia 12pt font
-        selection.font.name = "Georgia";
-        selection.font.size = 12;
-        
-        await context.sync();
-        
-        alert("Text pasted! Note: Formatting must be reapplied manually for now.");
-      });
-    } catch (error) {
-      console.error("Error with smart paste:", error);
-      alert("Could not access clipboard. Try using regular copy/paste + Clean button instead.");
-    }
-  }, [officeReady]);
 
   const applyFormat = useCallback((command) => {
     document.execCommand(command, false, null);
@@ -1516,7 +1113,6 @@ function CommentViewer() {
           <div className="flex gap-1">
             <button onClick={createNewCommentFromSelection} className="bg-[#C99700] hover:bg-[#B8860B] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer">+ New</button>
             <button onClick={loadCommentsFromWord} className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer">↻ Refresh</button>
-            <button onClick={cleanPaste} className="bg-[#16a34a] hover:bg-[#15803d] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer" title="Clean pasted text: removes unwanted nbsp and converts ° to nbsp">🧹 Clean</button>
             <button onClick={undo} disabled={historyIndex <= 0} className={(historyIndex <= 0 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Undo (Ctrl+Z)">⎌</button>
             <button onClick={redo} disabled={historyIndex >= history.length - 1} className={(historyIndex >= history.length - 1 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Redo (Ctrl+Shift+Z)">↷</button>
             <button onClick={exportComments} className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer" title="Export to JSON">↓</button>
