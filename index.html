@@ -268,7 +268,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   }, []);
 
   const handleCopy = useCallback((e) => {
-    console.log("=== COPY EVENT FIRED ===");
     const selection = window.getSelection();
     
     if (selection.rangeCount > 0) {
@@ -276,19 +275,17 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       const container = document.createElement("div");
       container.appendChild(range.cloneContents());
 
-      console.log("Original HTML:", container.innerHTML);
-
       // Remove background styling
       container.querySelectorAll('[style*="background"]').forEach((el) => {
         el.style.backgroundColor = "";
         el.style.background = "";
       });
       
-      // Build plain runs without any wrapper elements
+      // Build Word HTML - keep degree symbols as-is, they'll be converted by Clean Paste
       const processNodeForWord = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          // Convert degree symbols to nbsp
-          return node.textContent.replace(/°/g, '\u00A0')
+          // DON'T convert degree symbols yet - leave them for post-processing
+          return node.textContent
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
@@ -311,7 +308,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             childHTML += processNodeForWord(child);
           }
           
-          // Build font tag with face and style attributes (old-school HTML)
           if (isBold || isItalic) {
             let styleAttr = '';
             if (isBold && isItalic) styleAttr = 'font-weight:bold;font-style:italic';
@@ -329,38 +325,54 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       
       const contentHTML = processNodeForWord(container);
       
-      // Use Word's fragment format with StartFragment/EndFragment markers
-      const fragmentStart = '<!--StartFragment-->';
-      const fragmentEnd = '<!--EndFragment-->';
-      
       const wordHTML = 
         '<html>' +
-        '<head>' +
-        '<meta charset="utf-8">' +
-        '<style><!-- /* Font Definitions */ @font-face {font-family:Georgia;} --></style>' +
-        '</head>' +
-        '<body lang="EN-US" style="word-wrap:break-word">' +
-        '<div>' +
-        fragmentStart +
+        '<head><meta charset="utf-8"></head>' +
+        '<body>' +
         '<font face="Georgia" size="3">' + contentHTML + '</font>' +
-        fragmentEnd +
-        '</div>' +
         '</body>' +
         '</html>';
       
-      console.log("Word HTML:", wordHTML);
+      // Plain text also keeps degree symbols
+      let plainText = container.textContent;
       
-      let plainText = container.textContent.replace(/°/g, '\u00A0');
-      console.log("Plain text:", plainText);
-      
-      // Set both formats
       e.clipboardData.setData("text/plain", plainText);
       e.clipboardData.setData("text/html", wordHTML);
       e.preventDefault();
-      
-      console.log("=== COPY COMPLETE ===");
     }
   }, []);
+
+  const cleanPaste = useCallback(async () => {
+    if (!officeReady) {
+      alert("Office is not ready");
+      return;
+    }
+
+    try {
+      await Word.run(async (context) => {
+        const selection = context.document.getSelection();
+        selection.load("text");
+        await context.sync();
+
+        // Get the text and clean it
+        let cleanedText = selection.text;
+        
+        // Step 1: Remove all nbsp (these are the unwanted ones from formatting)
+        cleanedText = cleanedText.replace(/\u00A0/g, '');
+        
+        // Step 2: Convert degree symbols to nbsp (these are the wanted ones)
+        cleanedText = cleanedText.replace(/°/g, '\u00A0');
+        
+        // Replace the selection with cleaned text
+        selection.insertText(cleanedText, Word.InsertLocation.replace);
+        
+        await context.sync();
+      });
+    } catch (error) {
+      console.error("Error cleaning paste:", error);
+      alert("Error cleaning text: " + error.message);
+    }
+  }, [officeReady]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === ' ' && (e.altKey || (e.ctrlKey && e.shiftKey))) {
@@ -1125,6 +1137,7 @@ function CommentViewer() {
           <div className="flex gap-1">
             <button onClick={createNewCommentFromSelection} className="bg-[#C99700] hover:bg-[#B8860B] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer">+ New</button>
             <button onClick={loadCommentsFromWord} className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer">↻ Refresh</button>
+            <button onClick={cleanPaste} className="bg-[#16a34a] hover:bg-[#15803d] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer" title="Clean pasted text: removes unwanted nbsp and converts ° to nbsp">🧹 Clean</button>
             <button onClick={undo} disabled={historyIndex <= 0} className={(historyIndex <= 0 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Undo (Ctrl+Z)">⎌</button>
             <button onClick={redo} disabled={historyIndex >= history.length - 1} className={(historyIndex >= history.length - 1 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Redo (Ctrl+Shift+Z)">↷</button>
             <button onClick={exportComments} className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer" title="Export to JSON">↓</button>
