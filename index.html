@@ -41,6 +41,41 @@ console.log("Law Review Add-in Version 47");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("ErrorBoundary caught:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "20px", backgroundColor: "#fee", borderRadius: "8px", margin: "10px", fontFamily: "monospace" }}>
+          <h2 style={{ color: "#c00" }}>⚠️ Error</h2>
+          <p>{this.state.error?.message}</p>
+          <pre style={{ fontSize: "11px", overflow: "auto", backgroundColor: "#f0f0f0", padding: "10px", borderRadius: "4px" }}>
+            {this.state.error?.stack}
+          </pre>
+          <button onClick={() => window.location.reload()} style={{ padding: "8px 16px", backgroundColor: "#0066cc", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>
+            Reload App
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const AUTO_SAVE_DELAY = 2000;
 const LOCATION_PREVIEW_LENGTH = 50;
 const MAX_HISTORY_SIZE = 50;
@@ -701,13 +736,20 @@ function CommentViewer() {
   }, [comments, officeReady]);
 
   async function loadCommentsFromWord() {
+    console.log("[loadCommentsFromWord] Starting...");
     setLoading(true);
     try {
+      if (!Word) {
+        throw new Error("Word API not available");
+      }
+
       await Word.run(async (context) => {
+        console.log("[loadCommentsFromWord] Word.run started");
         const wordComments = context.document.body.getComments();
         wordComments.load("items");
         await context.sync();
 
+        console.log("[loadCommentsFromWord] Found " + wordComments.items.length + " comments");
         const commentData = [];
         for (let i = 0; i < wordComments.items.length; i++) {
           const comment = wordComments.items[i];
@@ -726,7 +768,7 @@ function CommentViewer() {
             try {
               tableData = JSON.parse(parts[1]);
             } catch (e) {
-              console.error("Error parsing comment data:", e);
+              console.error("[loadCommentsFromWord] Error parsing comment data:", e);
               tableData = { items: [createEmptyItem()] };
             }
           } else {
@@ -744,6 +786,7 @@ function CommentViewer() {
         }
 
         commentData.sort((a, b) => a.position - b.position);
+        console.log("[loadCommentsFromWord] Setting " + commentData.length + " comments to state");
         setComments(commentData);
 
         if (commentData.length > 0) {
@@ -753,7 +796,7 @@ function CommentViewer() {
         }
       });
     } catch (error) {
-      console.error("Error loading comments:", error);
+      console.error("[loadCommentsFromWord] Error:", error);
       alert("Error loading comments: " + error.message);
     } finally {
       setLoading(false);
@@ -830,6 +873,7 @@ function CommentViewer() {
   }
 
   async function finalizeCreateComment() {
+    console.log("[finalizeCreateComment] Starting...");
     if (!newCommentId.trim()) {
       alert("Please enter a comment ID!");
       return;
@@ -840,11 +884,17 @@ function CommentViewer() {
     }
 
     try {
+      if (!Word) {
+        throw new Error("Word API not available");
+      }
+
       await Word.run(async (context) => {
+        console.log("[finalizeCreateComment] Word.run started");
         const range = context.document.getSelection();
         range.insertComment(newCommentId);
         await context.sync();
 
+        console.log("[finalizeCreateComment] Comment inserted in Word");
         const timestamp = new Date();
         const newComment = {
           id: newCommentId,
@@ -863,10 +913,11 @@ function CommentViewer() {
         setNewCommentId("");
         setNewCommentLocation("");
 
+        console.log("[finalizeCreateComment] UI state updated");
         alert("Comment created successfully!");
       });
     } catch (error) {
-      console.error("Error finalizing comment:", error);
+      console.error("[finalizeCreateComment] Error:", error);
       alert("Error creating comment: " + error.message);
     }
   }
@@ -1295,7 +1346,11 @@ function CommentViewer() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<CommentViewer />);
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <ErrorBoundary>
+    <CommentViewer />
+  </ErrorBoundary>
+);
 </script>
 </body>
 </html>
