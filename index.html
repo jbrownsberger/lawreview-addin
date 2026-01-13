@@ -762,29 +762,39 @@ function CommentViewer() {
           range.load("start");
           await context.sync();
 
-          const content = comment.content;
+          const content = comment.content.trim();
           let commentId;
-          let tableData;
+          let tableData = { items: [createEmptyItem()] };
 
-          if (content.includes("|||")) {
-            const parts = content.split("|||");
-            commentId = parts;
-            try {
-              tableData = JSON.parse(parts);
-            } catch (e) {
-              console.error("[loadCommentsFromWord] Error parsing comment data:", e);
-              tableData = { items: [createEmptyItem()] };
+          // Try to find the separator
+          const separatorIndex = content.lastIndexOf("|||");
+          
+          if (separatorIndex !== -1 && separatorIndex > 0) {
+            // We have both ID and data
+            commentId = content.substring(0, separatorIndex).trim();
+            const jsonStr = content.substring(separatorIndex + 3).trim();
+            
+            if (jsonStr) {
+              try {
+                tableData = JSON.parse(jsonStr);
+              } catch (e) {
+                console.error("[loadCommentsFromWord] Error parsing JSON:", e, "JSON string:", jsonStr);
+                tableData = { items: [createEmptyItem()] };
+              }
             }
           } else {
+            // Only ID, no data yet
             commentId = content;
             tableData = { items: [createEmptyItem()] };
           }
+
+          console.log("[loadCommentsFromWord] Loaded comment:", commentId, "with", tableData.items.length, "items");
 
           commentData.push({
             id: commentId,
             position: range.start,
             location: "Position " + range.start,
-            timestamp: new Date().toISOString().split("T"),
+            timestamp: new Date().toISOString().split("T")[0],
             items: tableData.items
           });
         }
@@ -796,7 +806,7 @@ function CommentViewer() {
         if (commentData.length > 0) {
           setHistory([JSON.parse(JSON.stringify(commentData))]);
           setHistoryIndex(0);
-          setExpandedComments(new Set([commentData.id]));
+          setExpandedComments(new Set([commentData[0].id]));
         }
       });
     } catch (error) {
@@ -823,7 +833,7 @@ function CommentViewer() {
           await context.sync();
 
           const currentContent = wordComment.content;
-          const commentId = currentContent.includes("|||") ? currentContent.split("|||") : currentContent;
+          const commentId = currentContent.includes("|||") ? currentContent.split("|||")[0] : currentContent;
           const ourComment = comments.find((c) => c.id === commentId);
 
           if (ourComment) {
@@ -903,7 +913,7 @@ function CommentViewer() {
         const newComment = {
           id: newCommentId,
           location: newCommentLocation,
-          timestamp: timestamp.toISOString().split("T") + " " + timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          timestamp: timestamp.toISOString().split("T")[0] + " " + timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
           items: [createEmptyItem()]
         };
 
@@ -940,7 +950,7 @@ function CommentViewer() {
           await context.sync();
 
           const content = comment.content;
-          const actualCommentId = content.includes("|||") ? content.split("|||") : content;
+          const actualCommentId = content.includes("|||") ? content.split("|||")[0] : content;
 
           if (actualCommentId === commentId) {
             const range = comment.getRange();
@@ -1138,7 +1148,7 @@ function CommentViewer() {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "law-review-comments-" + new Date().toISOString().split("T") + ".json";
+    link.download = "law-review-comments-" + new Date().toISOString().split("T")[0] + ".json";
     link.click();
     URL.revokeObjectURL(url);
   }, [comments]);
