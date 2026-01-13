@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v47</title>
+<title>Law Review Comment Viewer - v48</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 47");
+console.log("Law Review Add-in Version 48");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -238,33 +238,36 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         if (node.nodeType === Node.ELEMENT_NODE) {
           const tagName = node.tagName.toLowerCase();
           const style = node.style;
+          const computedStyle = window.getComputedStyle(node);
           const styleAttr = node.getAttribute("style") || "";
           
           const isBold = tagName === "b" || tagName === "strong" ||
             style.fontWeight === "bold" || style.fontWeight === "700" ||
+            computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700" ||
             styleAttr.includes("font-weight: bold") || styleAttr.includes("font-weight:bold");
           const isItalic = tagName === "i" || tagName === "em" ||
             style.fontStyle === "italic" ||
+            computedStyle.fontStyle === "italic" ||
             styleAttr.includes("font-style: italic") || styleAttr.includes("font-style:italic");
 
           const children = Array.from(node.childNodes).map(processNode);
 
           let resultElement = null;
           
-          if (isItalic) {
-            const em = document.createElement("em");
-            children.forEach((child) => em.appendChild(child));
-            resultElement = em;
-          }
-          
           if (isBold) {
             const strong = document.createElement("strong");
-            if (resultElement) {
-              strong.appendChild(resultElement);
-            } else {
-              children.forEach((child) => strong.appendChild(child));
-            }
+            children.forEach((child) => strong.appendChild(child));
             resultElement = strong;
+          }
+          
+          if (isItalic) {
+            const em = document.createElement("em");
+            if (resultElement) {
+              em.appendChild(resultElement);
+            } else {
+              children.forEach((child) => em.appendChild(child));
+            }
+            resultElement = em;
           }
           
           if (resultElement) {
@@ -466,7 +469,8 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     
     const temp = document.createElement("div");
     temp.innerHTML = value;
-    const plainText = temp.textContent || temp.innerText || "";
+    let plainText = temp.textContent || temp.innerText || "";
+    plainText = plainText.replace(/°/g, '\u00A0');
     
     navigator.clipboard.writeText(plainText).then(() => {
       alert("Content copied as plain text!");
@@ -516,7 +520,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         <div className="absolute top-0.5 right-0.5 relative" ref={copyMenuRef}>
           <button
             onClick={() => setShowCopyMenu(!showCopyMenu)}
-            className="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+            className="px-1 py-0.5 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded text-xs font-medium transition-colors opacity-0 group-hover:opacity-100"
             title="Smart paste options"
           >
             ⇄
@@ -764,9 +768,9 @@ function CommentViewer() {
 
           if (content.includes("|||")) {
             const parts = content.split("|||");
-            commentId = parts[0];
+            commentId = parts;
             try {
-              tableData = JSON.parse(parts[1]);
+              tableData = JSON.parse(parts);
             } catch (e) {
               console.error("[loadCommentsFromWord] Error parsing comment data:", e);
               tableData = { items: [createEmptyItem()] };
@@ -780,7 +784,7 @@ function CommentViewer() {
             id: commentId,
             position: range.start,
             location: "Position " + range.start,
-            timestamp: new Date().toISOString().split("T")[0],
+            timestamp: new Date().toISOString().split("T"),
             items: tableData.items
           });
         }
@@ -792,7 +796,7 @@ function CommentViewer() {
         if (commentData.length > 0) {
           setHistory([JSON.parse(JSON.stringify(commentData))]);
           setHistoryIndex(0);
-          setExpandedComments(new Set([commentData[0].id]));
+          setExpandedComments(new Set([commentData.id]));
         }
       });
     } catch (error) {
@@ -819,7 +823,7 @@ function CommentViewer() {
           await context.sync();
 
           const currentContent = wordComment.content;
-          const commentId = currentContent.includes("|||") ? currentContent.split("|||")[0] : currentContent;
+          const commentId = currentContent.includes("|||") ? currentContent.split("|||") : currentContent;
           const ourComment = comments.find((c) => c.id === commentId);
 
           if (ourComment) {
@@ -899,7 +903,7 @@ function CommentViewer() {
         const newComment = {
           id: newCommentId,
           location: newCommentLocation,
-          timestamp: timestamp.toISOString().split("T")[0] + " " + timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          timestamp: timestamp.toISOString().split("T") + " " + timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
           items: [createEmptyItem()]
         };
 
@@ -936,7 +940,7 @@ function CommentViewer() {
           await context.sync();
 
           const content = comment.content;
-          const actualCommentId = content.includes("|||") ? content.split("|||")[0] : content;
+          const actualCommentId = content.includes("|||") ? content.split("|||") : content;
 
           if (actualCommentId === commentId) {
             const range = comment.getRange();
@@ -1134,7 +1138,7 @@ function CommentViewer() {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "law-review-comments-" + new Date().toISOString().split("T")[0] + ".json";
+    link.download = "law-review-comments-" + new Date().toISOString().split("T") + ".json";
     link.click();
     URL.revokeObjectURL(url);
   }, [comments]);
@@ -1313,7 +1317,9 @@ function CommentViewer() {
                               <td key={col.key} className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}>
                                 <button onClick={(e) => { e.stopPropagation(); toggleCellImplemented(comment.id, idx, col.key); }} className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")} style={{ zIndex: 20, cursor: "pointer" }} title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
                                 <div className={item.isHeading ? "font-semibold" : ""}>
-                                  <MemoizedRichTextCell value={item[col.key]} onChange={(html) => updateCell(comment.id, idx, col.key, html)} placeholder="—" column={col.key} commentId={comment.id} itemIndex={idx} addRowAfter={addRowAfter} cellContent={item[col.key]} officeReady={globalOfficeReady} />
+                                  <div className="group">
+                                    <MemoizedRichTextCell value={item[col.key]} onChange={(html) => updateCell(comment.id, idx, col.key, html)} placeholder="—" column={col.key} commentId={comment.id} itemIndex={idx} addRowAfter={addRowAfter} cellContent={item[col.key]} officeReady={globalOfficeReady} />
+                                  </div>
                                 </div>
                               </td>
                             ) : null
@@ -1340,7 +1346,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v47</span>
+        <span>v48</span>
       </div>
     </div>
   );
