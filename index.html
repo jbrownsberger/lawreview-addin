@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v48</title>
+<title>Law Review Comment Viewer - v49</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 48");
+console.log("Law Review Add-in Version 49");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -87,11 +87,11 @@ function ChevronUp() {
   );
 }
 
-function PasteIcon() {
+function ClipboardIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 10 4 15 9 20"></polyline>
-      <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
     </svg>
   );
 }
@@ -276,89 +276,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     }
   }, []);
 
-  const handleCopy = useCallback((e) => {
-    console.log("=== COPY EVENT FIRED ===");
-    const selection = window.getSelection();
-    
-    if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const container = document.createElement("div");
-      container.appendChild(range.cloneContents());
-
-      console.log("Original HTML:", container.innerHTML);
-
-      // Remove background styling
-      container.querySelectorAll('[style*="background"]').forEach((el) => {
-        el.style.backgroundColor = "";
-        el.style.background = "";
-      });
-      
-      // Build Word-specific HTML using only spans with mso styles
-      const processNodeForWord = (node) => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          // Convert degree symbols to nbsp and escape HTML
-          return node.textContent.replace(/°/g, '\u00A0')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        }
-        
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const tagName = node.tagName.toLowerCase();
-          const style = node.style;
-          const computedStyle = window.getComputedStyle(node);
-          
-          const isBold = tagName === "b" || tagName === "strong" ||
-            style.fontWeight === "bold" || style.fontWeight === "700" ||
-            computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700";
-          const isItalic = tagName === "i" || tagName === "em" ||
-            style.fontStyle === "italic" ||
-            computedStyle.fontStyle === "italic";
-          
-          let childHTML = "";
-          for (const child of node.childNodes) {
-            childHTML += processNodeForWord(child);
-          }
-          
-          // Use Word's mso-style formatting in spans only
-          if (isBold || isItalic) {
-            let styleStr = 'font-family:Georgia;font-size:12.0pt;';
-            if (isBold) styleStr += 'font-weight:bold;';
-            if (isItalic) styleStr += 'font-style:italic;';
-            return '<span style="' + styleStr + '">' + childHTML + '</span>';
-          } else {
-            return childHTML;
-          }
-        }
-        
-        return "";
-      };
-      
-      const contentHTML = processNodeForWord(container);
-      
-      // Minimal Word HTML - just the formatted fragment
-      const wordHTML = 
-        '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">' +
-        '<head><meta charset="utf-8"></head>' +
-        '<body>' +
-        '<span style="font-family:Georgia;font-size:12.0pt;">' + contentHTML + '</span>' +
-        '</body>' +
-        '</html>';
-      
-      console.log("Word HTML:", wordHTML);
-      
-      let plainText = container.textContent.replace(/°/g, '\u00A0');
-      console.log("Plain text:", plainText);
-      
-      // Set both formats
-      e.clipboardData.setData("text/plain", plainText);
-      e.clipboardData.setData("text/html", wordHTML);
-      e.preventDefault();
-      
-      console.log("=== COPY COMPLETE ===");
-    }
-  }, []);
-
   const handleKeyDown = useCallback((e) => {
     if (e.key === ' ' && (e.altKey || (e.ctrlKey && e.shiftKey))) {
       e.preventDefault();
@@ -433,7 +350,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         contentEditable
         onInput={handleInput}
         onPaste={handlePaste}
-        onCopy={handleCopy}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
         className="w-full min-h-[1.4rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-1 py-0.5 cursor-text leading-tight"
@@ -466,6 +382,7 @@ function CommentViewer() {
   const [newCommentId, setNewCommentId] = useState("");
   const [newCommentLocation, setNewCommentLocation] = useState("");
   const [saveStatus, setSaveStatus] = useState("idle");
+  const [smartPasteContent, setSmartPasteContent] = useState("");
   const saveTimeoutRef = useRef(null);
   const commentIdInputRef = useRef(null);
   const [history, setHistory] = useState([]);
@@ -495,7 +412,7 @@ function CommentViewer() {
     }
   }, [currentUsername]);
 
-  // Global copy handler for formatting preservation
+  // Global copy handler: Stages content for Smart Paste AND System Clipboard
   useEffect(() => {
     const handleGlobalCopy = (e) => {
       const selection = window.getSelection();
@@ -510,18 +427,14 @@ function CommentViewer() {
           el.style.background = "";
         });
         
-        const escapeRTFText = (text) => {
-          text = text.replace(/°/g, '___DEGREE_NBSP___');
-          text = text.replace(/\\/g, '\\\\');
-          text = text.replace(/\{/g, '\\{');
-          text = text.replace(/\}/g, '\\}');
-          text = text.replace(/___DEGREE_NBSP___/g, '\\~');
-          return text;
-        };
-        
-        const convertToRTF = (node) => {
+        // Build Word-specific HTML using only spans with mso styles
+        const processNodeForWord = (node) => {
           if (node.nodeType === Node.TEXT_NODE) {
-            return escapeRTFText(node.textContent);
+            // Convert degree symbols to nbsp and escape HTML
+            return node.textContent.replace(/°/g, '\u00A0')
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
           }
           
           if (node.nodeType === Node.ELEMENT_NODE) {
@@ -536,37 +449,47 @@ function CommentViewer() {
               style.fontStyle === "italic" ||
               computedStyle.fontStyle === "italic";
             
-            let childRTF = "";
+            let childHTML = "";
             for (const child of node.childNodes) {
-              childRTF += convertToRTF(child);
+              childHTML += processNodeForWord(child);
             }
             
-            let result = childRTF;
-            if (isItalic) {
-              result = "{\\i " + result + "}";
+            // Use Word's mso-style formatting in spans only
+            if (isBold || isItalic) {
+              let styleStr = 'font-family:Georgia;font-size:12.0pt;';
+              if (isBold) styleStr += 'font-weight:bold;';
+              if (isItalic) styleStr += 'font-style:italic;';
+              return '<span style="' + styleStr + '">' + childHTML + '</span>';
+            } else {
+              return childHTML;
             }
-            if (isBold) {
-              result = "{\\b " + result + "}";
-            }
-            
-            return result;
           }
           
           return "";
         };
         
-        const contentRTF = convertToRTF(container);
+        const contentHTML = processNodeForWord(container);
         
-        const rtfDocument = "{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat{\\fonttbl{\\f0\\fnil\\fcharset0 Georgia;}}" +
-          "{\\colortbl ;\\red0\\green0\\blue0;}" +
-          "\\viewkind4\\uc1\\pard\\f0\\fs24 " + contentRTF + "}";
+        // STAGE FOR SMART PASTE
+        setSmartPasteContent(contentHTML);
+        
+        // Minimal Word HTML - just the formatted fragment
+        const wordHTML = 
+          '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">' +
+          '<head><meta charset="utf-8"></head>' +
+          '<body>' +
+          '<span style="font-family:Georgia;font-size:12.0pt;">' + contentHTML + '</span>' +
+          '</body>' +
+          '</html>';
         
         let plainText = container.textContent.replace(/°/g, '\u00A0');
         
-        // Only set plain text and RTF - NO HTML to avoid Word's unwanted nbsp
+        // SET SYSTEM CLIPBOARD
         e.clipboardData.setData("text/plain", plainText);
-        e.clipboardData.setData("text/rtf", rtfDocument);
+        e.clipboardData.setData("text/html", wordHTML);
         e.preventDefault();
+        
+        console.log("=== GLOBAL COPY HANDLED ===");
       }
     };
 
@@ -675,6 +598,10 @@ function CommentViewer() {
       return;
     }
     
+    if (!htmlContent) {
+      return;
+    }
+    
     try {
       await Word.run(async (context) => {
         const selection = context.document.getSelection();
@@ -683,7 +610,10 @@ function CommentViewer() {
         // Replace custom degree placeholder with non-breaking space
         cleanHtml = cleanHtml.replace(/°/g, '&nbsp;');
         
-        selection.insertHtml(cleanHtml, Word.InsertLocation.replace);
+        // Explicitly wrap in Georgia 12pt span
+        const wrappedHtml = `<span style="font-family: 'Georgia', serif; font-size: 12pt;">${cleanHtml}</span>`;
+        
+        selection.insertHtml(wrappedHtml, Word.InsertLocation.replace);
         await context.sync();
       });
     } catch (error) {
@@ -1144,6 +1074,9 @@ function CommentViewer() {
           <div className="flex gap-1">
             <button onClick={createNewCommentFromSelection} className="bg-[#C99700] hover:bg-[#B8860B] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer">+ New</button>
             <button onClick={loadCommentsFromWord} className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer">↻ Refresh</button>
+            <button onClick={() => insertTextToWord(smartPasteContent)} disabled={!smartPasteContent} className={(!smartPasteContent ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Smart Paste (Insert copied text into Word)">
+              <ClipboardIcon />
+            </button>
             <button onClick={undo} disabled={historyIndex <= 0} className={(historyIndex <= 0 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Undo (Ctrl+Z)">⎌</button>
             <button onClick={redo} disabled={historyIndex >= history.length - 1} className={(historyIndex >= history.length - 1 ? "bg-[#4A5568] cursor-not-allowed" : "bg-[#1E3A5F] hover:bg-[#2D4A6F] cursor-pointer") + " text-white px-2 py-0.5 rounded text-xs font-medium transition-colors"} title="Redo (Ctrl+Shift+Z)">↷</button>
             <button onClick={exportComments} className="bg-[#1E3A5F] hover:bg-[#2D4A6F] text-white px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer" title="Export to JSON">↓</button>
@@ -1299,7 +1232,6 @@ function CommentViewer() {
                           {columns.map((col) => (
                             !collapsedColumns.has(col.key) ? (
                               <td key={col.key} className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}>
-                                <button onClick={(e) => { e.stopPropagation(); insertTextToWord(item[col.key]); }} className="absolute top-0 right-6 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors bg-blue-100 text-blue-600 hover:bg-blue-200" style={{ zIndex: 20, cursor: "pointer" }} title="Smart Paste into Word"><PasteIcon /></button>
                                 <button onClick={(e) => { e.stopPropagation(); toggleCellImplemented(comment.id, idx, col.key); }} className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")} style={{ zIndex: 20, cursor: "pointer" }} title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
                                 <div className={item.isHeading ? "font-semibold" : ""}>
                                   <MemoizedRichTextCell value={item[col.key]} onChange={(html) => updateCell(comment.id, idx, col.key, html)} placeholder="—" column={col.key} commentId={comment.id} itemIndex={idx} addRowAfter={addRowAfter} />
@@ -1329,7 +1261,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v48</span>
+        <span>v49</span>
       </div>
     </div>
   );
