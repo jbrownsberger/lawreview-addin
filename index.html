@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v49</title>
+<title>Law Review Comment Viewer - v53</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 49");
+console.log("Law Review Add-in Version 53");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -223,6 +223,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
           let resultElement = null;
           
+          // Reconstruct element nesting
           if (isItalic) {
             const em = document.createElement("em");
             children.forEach((child) => em.appendChild(child));
@@ -427,7 +428,7 @@ function CommentViewer() {
           el.style.background = "";
         });
         
-        // Build Word-specific HTML using only spans with mso styles
+        // Build Word-specific HTML using simpler spans
         const processNodeForWord = (node) => {
           if (node.nodeType === Node.TEXT_NODE) {
             // Convert degree symbols to nbsp and escape HTML
@@ -440,26 +441,29 @@ function CommentViewer() {
           if (node.nodeType === Node.ELEMENT_NODE) {
             const tagName = node.tagName.toLowerCase();
             const style = node.style;
-            const computedStyle = window.getComputedStyle(node);
+            const styleAttr = node.getAttribute("style") || "";
             
+            // Check styles
             const isBold = tagName === "b" || tagName === "strong" ||
               style.fontWeight === "bold" || style.fontWeight === "700" ||
-              computedStyle.fontWeight === "bold" || computedStyle.fontWeight === "700";
+              styleAttr.includes("font-weight: bold") || styleAttr.includes("font-weight:bold");
+              
             const isItalic = tagName === "i" || tagName === "em" ||
               style.fontStyle === "italic" ||
-              computedStyle.fontStyle === "italic";
+              styleAttr.includes("font-style: italic");
             
             let childHTML = "";
             for (const child of node.childNodes) {
               childHTML += processNodeForWord(child);
             }
             
-            // Use Word's mso-style formatting in spans only
-            if (isBold || isItalic) {
-              let styleStr = 'font-family:Georgia;font-size:12.0pt;';
-              if (isBold) styleStr += 'font-weight:bold;';
-              if (isItalic) styleStr += 'font-style:italic;';
-              return '<span style="' + styleStr + '">' + childHTML + '</span>';
+            // Only apply specific deltas
+            const styleParts = [];
+            if (isBold) styleParts.push("font-weight:bold");
+            if (isItalic) styleParts.push("font-style:italic");
+            
+            if (styleParts.length > 0) {
+              return '<span style="' + styleParts.join(';') + '">' + childHTML + '</span>';
             } else {
               return childHTML;
             }
@@ -473,7 +477,7 @@ function CommentViewer() {
         // STAGE FOR SMART PASTE
         setSmartPasteContent(contentHTML);
         
-        // Minimal Word HTML - just the formatted fragment
+        // Minimal Word HTML - Apply Base Font HERE on the wrapper only
         const wordHTML = 
           '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">' +
           '<head><meta charset="utf-8"></head>' +
@@ -706,6 +710,7 @@ function CommentViewer() {
           commentData.push({
             id: commentId,
             position: range.start,
+            location: "Position " + range.start,
             location: "Position " + range.start,
             timestamp: new Date().toISOString().split("T")[0],
             items: tableData.items
@@ -1261,7 +1266,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v49</span>
+        <span>v53</span>
       </div>
     </div>
   );
