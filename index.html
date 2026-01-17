@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v49</title>
+<title>Law Review Comment Viewer - v50</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 49");
+console.log("Law Review Add-in Version 50");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -218,11 +218,16 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
           const isItalic = tagName === "i" || tagName === "em" ||
             style.fontStyle === "italic" ||
             styleAttr.includes("font-style: italic") || styleAttr.includes("font-style:italic");
+          // Check for small caps
+          const isSmallCaps = style.fontVariant === "small-caps" ||
+             styleAttr.includes("font-variant: small-caps") ||
+             styleAttr.includes("font-variant:small-caps");
 
           const children = Array.from(node.childNodes).map(processNode);
 
           let resultElement = null;
           
+          // Reconstruct element nesting
           if (isItalic) {
             const em = document.createElement("em");
             children.forEach((child) => em.appendChild(child));
@@ -237,6 +242,17 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
               children.forEach((child) => strong.appendChild(child));
             }
             resultElement = strong;
+          }
+          
+          if (isSmallCaps) {
+             const span = document.createElement("span");
+             span.style.fontVariant = "small-caps";
+             if (resultElement) {
+                span.appendChild(resultElement);
+             } else {
+                children.forEach(child => span.appendChild(child));
+             }
+             resultElement = span;
           }
           
           if (resultElement) {
@@ -440,6 +456,7 @@ function CommentViewer() {
           if (node.nodeType === Node.ELEMENT_NODE) {
             const tagName = node.tagName.toLowerCase();
             const style = node.style;
+            const styleAttr = node.getAttribute("style") || "";
             const computedStyle = window.getComputedStyle(node);
             
             const isBold = tagName === "b" || tagName === "strong" ||
@@ -448,6 +465,10 @@ function CommentViewer() {
             const isItalic = tagName === "i" || tagName === "em" ||
               style.fontStyle === "italic" ||
               computedStyle.fontStyle === "italic";
+              
+            const isSmallCaps = style.fontVariant === "small-caps" ||
+               styleAttr.includes("font-variant: small-caps") ||
+               styleAttr.includes("font-variant:small-caps");
             
             let childHTML = "";
             for (const child of node.childNodes) {
@@ -455,10 +476,12 @@ function CommentViewer() {
             }
             
             // Use Word's mso-style formatting in spans only
-            if (isBold || isItalic) {
+            if (isBold || isItalic || isSmallCaps) {
               let styleStr = 'font-family:Georgia;font-size:12.0pt;';
               if (isBold) styleStr += 'font-weight:bold;';
               if (isItalic) styleStr += 'font-style:italic;';
+              if (isSmallCaps) styleStr += 'font-variant:small-caps;';
+              
               return '<span style="' + styleStr + '">' + childHTML + '</span>';
             } else {
               return childHTML;
@@ -499,6 +522,48 @@ function CommentViewer() {
 
   const applyFormat = useCallback((command) => {
     document.execCommand(command, false, null);
+  }, []);
+
+  const toggleSmallCaps = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    
+    // Naive toggle check: look at parent
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+    
+    let scSpan = null;
+    let curr = node;
+    // Walk up to find small caps span inside editor
+    while (curr && curr.getAttribute && curr.contentEditable !== "true") {
+       if (curr.style.fontVariant === "small-caps") {
+           scSpan = curr;
+           break;
+       }
+       curr = curr.parentElement;
+    }
+    
+    if (scSpan) {
+        // Unwrap
+        const parent = scSpan.parentNode;
+        while (scSpan.firstChild) {
+            parent.insertBefore(scSpan.firstChild, scSpan);
+        }
+        parent.removeChild(scSpan);
+    } else {
+        // Wrap
+        const span = document.createElement("span");
+        span.style.fontVariant = "small-caps";
+        try {
+            range.surroundContents(span);
+        } catch (e) {
+            // Fallback for complex selections (multinode)
+            const frag = range.extractContents();
+            span.appendChild(frag);
+            range.insertNode(span);
+        }
+    }
   }, []);
 
   const toggleHighlight = useCallback(() => {
@@ -1086,6 +1151,7 @@ function CommentViewer() {
         <div className="flex gap-1 flex-wrap">
           <button onClick={() => applyFormat("bold")} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded font-bold text-white text-xs transition-colors" title="Bold (Ctrl+B)">B</button>
           <button onClick={() => applyFormat("italic")} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded italic text-white text-xs transition-colors" title="Italic (Ctrl+I)">I</button>
+          <button onClick={toggleSmallCaps} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-white text-xs transition-colors" style={{fontVariant: "small-caps"}} title="Small Caps">SC</button>
           <button onClick={toggleHighlight} className="px-2 py-0.5 bg-[#C99700] hover:bg-[#B8860B] border border-[#B8860B] rounded text-white text-xs font-medium transition-colors" title="Toggle Highlight">H</button>
           <button onClick={toggleRed} className="px-2 py-0.5 bg-red-500 hover:bg-red-600 border border-red-600 rounded text-white text-xs font-medium transition-colors" title="Toggle Red Text">R</button>
           <button onClick={() => applyFormat("removeFormat")} className="px-2 py-0.5 bg-[#334155] hover:bg-[#1E293B] border border-[#475569] rounded text-red-400 text-xs transition-colors" title="Clear Formatting">✕</button>
@@ -1261,7 +1327,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v49</span>
+        <span>v50</span>
       </div>
     </div>
   );
