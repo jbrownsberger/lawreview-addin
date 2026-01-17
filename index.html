@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v50</title>
+<title>Law Review Comment Viewer - v51</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 50");
+console.log("Law Review Add-in Version 51");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -435,7 +435,40 @@ function CommentViewer() {
       if (selection.rangeCount > 0 && !selection.isCollapsed) {
         const range = selection.getRangeAt(0);
         const container = document.createElement("div");
-        container.appendChild(range.cloneContents());
+        
+        // --- INHERITANCE FIX ---
+        // Clone contents only grabs the text inside the selection, missing parent styling.
+        // We must walk up the DOM to see if we are inside a Small Caps wrapper.
+        const clone = range.cloneContents();
+        let wrapper = container;
+        
+        // Check for parent formatting (Small Caps, Bold, Italic)
+        // Note: Bold/Italic usually split nodes, but Small Caps is our custom span.
+        let parent = range.commonAncestorContainer;
+        if (parent.nodeType === Node.TEXT_NODE) {
+          parent = parent.parentNode;
+        }
+
+        let inheritedSmallCaps = false;
+        let curr = parent;
+        while (curr && curr.getAttribute && curr.contentEditable !== "true") {
+          const style = curr.style;
+          const styleAttr = curr.getAttribute("style") || "";
+          if (style.fontVariant === "small-caps" || styleAttr.includes("font-variant: small-caps") || styleAttr.includes("font-variant:small-caps")) {
+            inheritedSmallCaps = true;
+          }
+          curr = curr.parentNode;
+        }
+
+        if (inheritedSmallCaps) {
+          const scSpan = document.createElement("span");
+          scSpan.style.fontVariant = "small-caps";
+          wrapper.appendChild(scSpan);
+          wrapper = scSpan; // Append cloned content inside this span
+        }
+        
+        wrapper.appendChild(clone);
+        // --- END INHERITANCE FIX ---
 
         // Remove background styling
         container.querySelectorAll('[style*="background"]').forEach((el) => {
@@ -480,7 +513,8 @@ function CommentViewer() {
               let styleStr = 'font-family:Georgia;font-size:12.0pt;';
               if (isBold) styleStr += 'font-weight:bold;';
               if (isItalic) styleStr += 'font-style:italic;';
-              if (isSmallCaps) styleStr += 'font-variant:small-caps;';
+              // Force both variants for max compatibility
+              if (isSmallCaps) styleStr += 'font-variant:small-caps;font-variant-caps:small-caps;';
               
               return '<span style="' + styleStr + '">' + childHTML + '</span>';
             } else {
@@ -1327,7 +1361,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v50</span>
+        <span>v51</span>
       </div>
     </div>
   );
