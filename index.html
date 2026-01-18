@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v53</title>
+<title>Law Review Comment Viewer - v54</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 53");
+console.log("Law Review Add-in Version 54");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -117,6 +117,65 @@ function SaveIndicator({ status }) {
   return <span className="save-indicator text-xs opacity-0"></span>;
 }
 
+// --- Helper to auto-linkify text ---
+function transformTextToLinks(html) {
+  if (!html) return html;
+  
+  // Create a temporary container to safely traverse text nodes
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  
+  const walker = document.createTreeWalker(temp, NodeFilter.SHOW_TEXT, null, false);
+  const nodesToProcess = [];
+  let node;
+  
+  // Collect eligible text nodes (skip those already inside <a> tags)
+  while(node = walker.nextNode()) {
+    if (node.parentElement.tagName === 'A') continue;
+    nodesToProcess.push(node);
+  }
+  
+  let modified = false;
+  
+  nodesToProcess.forEach(textNode => {
+    let text = textNode.textContent;
+    let newHtml = text;
+    let nodeModified = false;
+    
+    // 1. Bluebook Regex: BB 1.2
+    newHtml = newHtml.replace(/\bBB\s+(\d+(?:\.\d+)?)\b/g, (match, rule) => {
+      nodeModified = true;
+      modified = true;
+      return `<a href="https://www.legalbluebook.com/bluebook/search-results?search=${rule}&facet=whitepages" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
+    });
+    
+    // 2. CMOS Regex: CMOS 5.1
+    newHtml = newHtml.replace(/\bCMOS\s+(\d+)\.(\d+)\b/g, (match, ch, sec) => {
+      nodeModified = true;
+      modified = true;
+      const chNum = parseInt(ch, 10);
+      const chPad = String(chNum).padStart(2, '0');
+      const secPad = String(sec).padStart(3, '0');
+      
+      // Determine Part based on Chapter (Ed 18 structure approximation)
+      let part = 'part1';
+      if (chNum >= 5 && chNum <= 10) part = 'part2';
+      else if (chNum >= 11 && chNum <= 16) part = 'part3';
+      
+      const url = `https://www-chicagomanualofstyle-org.proxy.library.nd.edu/book/ed18/${part}/ch${chPad}/psec${secPad}.html`;
+      return `<a href="${url}" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
+    });
+    
+    if (nodeModified) {
+      const span = document.createElement('span');
+      span.innerHTML = newHtml;
+      textNode.parentNode.replaceChild(span, textNode);
+    }
+  });
+  
+  return modified ? temp.innerHTML : html;
+}
+
 function RichTextCell({ value, onChange, placeholder, column, commentId, itemIndex, addRowAfter }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
@@ -191,6 +250,17 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     
     onChange(rawHtml);
     isUpdatingRef.current = false;
+  }, [onChange]);
+
+  const handleBlur = useCallback(() => {
+    if (editorRef.current) {
+        const currentHtml = editorRef.current.innerHTML;
+        const linkedHtml = transformTextToLinks(currentHtml);
+        if (linkedHtml !== currentHtml) {
+            editorRef.current.innerHTML = linkedHtml;
+            onChange(linkedHtml);
+        }
+    }
   }, [onChange]);
 
   const handlePaste = useCallback((e) => {
@@ -350,6 +420,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         ref={editorRef}
         contentEditable
         onInput={handleInput}
+        onBlur={handleBlur}
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
@@ -443,6 +514,13 @@ function CommentViewer() {
             const style = node.style;
             const styleAttr = node.getAttribute("style") || "";
             
+            // Check for links first
+            if (tagName === "a") {
+                const href = node.getAttribute("href");
+                const content = Array.from(node.childNodes).map(processNodeForWord).join("");
+                return `<a href="${href}">${content}</a>`;
+            }
+
             // Check styles
             const isBold = tagName === "b" || tagName === "strong" ||
               style.fontWeight === "bold" || style.fontWeight === "700" ||
@@ -452,6 +530,11 @@ function CommentViewer() {
               style.fontStyle === "italic" ||
               styleAttr.includes("font-style: italic");
             
+            const isRed = style.color === "red" || 
+                          style.color === "rgb(255, 0, 0)" || 
+                          styleAttr.includes("color: red") ||
+                          styleAttr.includes("color:red");
+
             let childHTML = "";
             for (const child of node.childNodes) {
               childHTML += processNodeForWord(child);
@@ -461,6 +544,7 @@ function CommentViewer() {
             const styleParts = [];
             if (isBold) styleParts.push("font-weight:bold");
             if (isItalic) styleParts.push("font-style:italic");
+            if (isRed) styleParts.push("color:red");
             
             if (styleParts.length > 0) {
               return '<span style="' + styleParts.join(';') + '">' + childHTML + '</span>';
@@ -525,26 +609,29 @@ function CommentViewer() {
     if (selection.rangeCount > 0 && !selection.isCollapsed) {
       const range = selection.getRangeAt(0);
       
+      // IMPROVED RED DETECTION
+      // 1. Check if the computed style of the container is already red
+      // 2. Scan the selection's contents for any red nodes
+      
       let hasRed = false;
-      const container = range.commonAncestorContainer;
+      const parent = range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
+        ? range.commonAncestorContainer.parentElement 
+        : range.commonAncestorContainer;
       
-      if (container.nodeType === Node.TEXT_NODE) {
-        const parent = container.parentElement;
-        if (parent) {
-          const computedColor = window.getComputedStyle(parent).color;
-          hasRed = computedColor === "rgb(255, 0, 0)" || parent.style.color === "red";
+      const computedColor = window.getComputedStyle(parent).color;
+      if (computedColor === 'rgb(255, 0, 0)' || parent.style.color === 'red') {
+        hasRed = true;
+      } else {
+        // Scan internal contents
+        const fragment = range.cloneContents();
+        const div = document.createElement('div');
+        div.appendChild(fragment);
+        // Check for common red markers
+        if (div.querySelector('[style*="color: red"]') || 
+            div.querySelector('[style*="color: rgb(255, 0, 0)"]') ||
+            div.querySelector('font[color="red"]')) {
+            hasRed = true;
         }
-      } else if (container.nodeType === Node.ELEMENT_NODE) {
-        const computedColor = window.getComputedStyle(container).color;
-        hasRed = computedColor === "rgb(255, 0, 0)" || container.style.color === "red";
-      }
-      
-      const rangeContainer = document.createElement("div");
-      rangeContainer.appendChild(range.cloneContents());
-      if (!hasRed) {
-        hasRed = rangeContainer.querySelector('[style*="color: red"]') !== null ||
-                 rangeContainer.querySelector('[style*="color: rgb(255, 0, 0)"]') !== null ||
-                 rangeContainer.querySelector('font[color="red"]') !== null;
       }
 
       if (hasRed) {
@@ -1266,7 +1353,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v53</span>
+        <span>v54</span>
       </div>
     </div>
   );
