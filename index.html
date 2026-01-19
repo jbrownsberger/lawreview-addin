@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v54</title>
+<title>Law Review Comment Viewer - v55</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 54");
+console.log("Law Review Add-in Version 55");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -164,6 +164,13 @@ function transformTextToLinks(html) {
       
       const url = `https://www-chicagomanualofstyle-org.proxy.library.nd.edu/book/ed18/${part}/ch${chPad}/psec${secPad}.html`;
       return `<a href="${url}" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
+    });
+
+    // 3. Goldbook Regex: GB 104
+    newHtml = newHtml.replace(/\bGB\s+(\d+(?:\.\d+)?)\b/g, (match, rule) => {
+      nodeModified = true;
+      modified = true;
+      return `<a href="https://jbrownsberger.github.io/GoldbookWeb/#rule-${rule}" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
     });
     
     if (nodeModified) {
@@ -1353,7 +1360,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v54</span>
+        <span>v55</span>
       </div>
     </div>
   );
