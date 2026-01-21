@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v56</title>
+<title>Law Review Comment Viewer - v57</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -37,7 +37,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 56");
+console.log("Law Review Add-in Version 57");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -355,12 +355,14 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   }, []);
 
   const handleKeyDown = useCallback((e) => {
+    // Degree symbol shortcut
     if (e.key === ' ' && (e.altKey || (e.ctrlKey && e.shiftKey))) {
       e.preventDefault();
       document.execCommand("insertText", false, "°");
       return;
     }
 
+    // Bold/Italic/Underline shortcuts
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
       document.execCommand("bold", false, null);
@@ -377,6 +379,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       return;
     }
 
+    // Shift+Enter: New Row + Focus
     if (e.shiftKey && e.key === "Enter") {
       e.preventDefault();
       if (addRowAfter && commentId && itemIndex !== undefined) {
@@ -391,15 +394,19 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             const sel = window.getSelection();
             if (nextCell.childNodes.length > 0) {
               range.setStart(nextCell, 0);
-              range.collapse(true);
-              sel.removeAllRanges();
-              sel.addRange(range);
+            } else {
+              range.setStart(nextCell, 0);
             }
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
           }
         }, 50);
       }
       return;
     }
+
+    // Tab: Move Down (Shift+Tab: Move Up)
     if (e.key === "Tab") {
       e.preventDefault();
       const allCells = Array.from(document.querySelectorAll('[data-cell-column="' + column + '"]'));
@@ -409,14 +416,14 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       if (nextIndex >= 0 && nextIndex < allCells.length) {
         const nextCell = allCells[nextIndex];
         nextCell.focus();
+        
+        // Select all content in target cell
         const range = document.createRange();
         const sel = window.getSelection();
-        if (nextCell.childNodes.length > 0) {
-          range.selectNodeContents(nextCell);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
+        range.selectNodeContents(nextCell);
+        range.collapse(false); // Collapse to end if preferred, or remove to keep selected
+        sel.removeAllRanges();
+        sel.addRange(range);
       }
     }
   }, [column, addRowAfter, commentId, itemIndex]);
@@ -450,6 +457,48 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 }
 
 const MemoizedRichTextCell = React.memo(RichTextCell);
+
+// --- NEW MEMOIZED ROW COMPONENT ---
+const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns, updateCell, toggleCellImplemented, insertTextToWord, addRowAfter, toggleHeading, setDeleteConfirm }) => {
+  const rowBgClass = item.isHeading ? "bg-[#FEF9C3]" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50");
+  
+  // Handlers for this specific row to avoid recreating functions in render
+  const handleIdChange = (e) => updateCell(commentId, idx, "id", e.target.value);
+  
+  return (
+    <tr className={`group ${rowBgClass} transition-colors`}>
+      <td className="px-1 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "40px", width: "40px" }}>
+        <input type="text" value={item.id} onChange={handleIdChange} className={"w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs" + (item.isHeading ? " font-bold" : "")} placeholder="#" />
+      </td>
+      {columns.map((col) => (
+        !collapsedColumns.has(col.key) ? (
+          <td key={col.key} className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}>
+            <button onClick={(e) => { e.stopPropagation(); toggleCellImplemented(commentId, idx, col.key); }} className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")} style={{ zIndex: 20, cursor: "pointer" }} title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
+            <div className={item.isHeading ? "font-semibold" : ""}>
+              <MemoizedRichTextCell 
+                value={item[col.key]} 
+                onChange={(html) => updateCell(commentId, idx, col.key, html)} 
+                placeholder="—" 
+                column={col.key} 
+                commentId={commentId}
+                itemIndex={idx}
+                addRowAfter={addRowAfter}
+              />
+            </div>
+          </td>
+        ) : null
+      ))}
+      {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
+      <td className="px-1 py-0 align-top">
+        <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col gap-0 py-0.5">
+          <button onClick={() => addRowAfter(commentId, idx)} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors" title="Add row below">+</button>
+          <button onClick={() => toggleHeading(commentId, idx)} className={"w-5 h-4 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-[#C99700] text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")} title="Toggle heading">H</button>
+          <button onClick={() => setDeleteConfirm({ commentId: commentId, itemIndex: idx })} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors" title="Delete row">×</button>
+        </div>
+      </td>
+    </tr>
+  );
+});
 
 function CommentViewer() {
   const [expandedComments, setExpandedComments] = useState(new Set());
@@ -492,7 +541,7 @@ function CommentViewer() {
     }
   }, [currentUsername]);
 
-  // Global copy handler: Stages content for Smart Paste AND System Clipboard
+  // Global copy handler
   useEffect(() => {
     const handleGlobalCopy = (e) => {
       const selection = window.getSelection();
@@ -501,16 +550,13 @@ function CommentViewer() {
         const container = document.createElement("div");
         container.appendChild(range.cloneContents());
 
-        // Remove background styling
         container.querySelectorAll('[style*="background"]').forEach((el) => {
           el.style.backgroundColor = "";
           el.style.background = "";
         });
         
-        // Build Word-specific HTML using simpler spans
         const processNodeForWord = (node) => {
           if (node.nodeType === Node.TEXT_NODE) {
-            // Convert degree symbols to nbsp and escape HTML
             return node.textContent.replace(/°/g, '\u00A0')
               .replace(/&/g, '&amp;')
               .replace(/</g, '&lt;')
@@ -522,14 +568,12 @@ function CommentViewer() {
             const style = node.style;
             const styleAttr = node.getAttribute("style") || "";
             
-            // Check for links first
             if (tagName === "a") {
                 const href = node.getAttribute("href");
                 const content = Array.from(node.childNodes).map(processNodeForWord).join("");
                 return `<a href="${href}">${content}</a>`;
             }
 
-            // Check styles
             const isBold = tagName === "b" || tagName === "strong" ||
               style.fontWeight === "bold" || style.fontWeight === "700" ||
               styleAttr.includes("font-weight: bold") || styleAttr.includes("font-weight:bold");
@@ -548,7 +592,6 @@ function CommentViewer() {
               childHTML += processNodeForWord(child);
             }
             
-            // Only apply specific deltas
             const styleParts = [];
             if (isBold) styleParts.push("font-weight:bold");
             if (isItalic) styleParts.push("font-style:italic");
@@ -560,16 +603,12 @@ function CommentViewer() {
               return childHTML;
             }
           }
-          
           return "";
         };
         
         const contentHTML = processNodeForWord(container);
-        
-        // STAGE FOR SMART PASTE
         setSmartPasteContent(contentHTML);
         
-        // Minimal Word HTML - Apply Base Font HERE on the wrapper only
         const wordHTML = 
           '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">' +
           '<head><meta charset="utf-8"></head>' +
@@ -579,13 +618,9 @@ function CommentViewer() {
           '</html>';
         
         let plainText = container.textContent.replace(/°/g, '\u00A0');
-        
-        // SET SYSTEM CLIPBOARD
         e.clipboardData.setData("text/plain", plainText);
         e.clipboardData.setData("text/html", wordHTML);
         e.preventDefault();
-        
-        console.log("=== GLOBAL COPY HANDLED ===");
       }
     };
 
@@ -617,10 +652,6 @@ function CommentViewer() {
     if (selection.rangeCount > 0 && !selection.isCollapsed) {
       const range = selection.getRangeAt(0);
       
-      // IMPROVED RED DETECTION
-      // 1. Check if the computed style of the container is already red
-      // 2. Scan the selection's contents for any red nodes
-      
       let hasRed = false;
       const parent = range.commonAncestorContainer.nodeType === Node.TEXT_NODE 
         ? range.commonAncestorContainer.parentElement 
@@ -630,11 +661,9 @@ function CommentViewer() {
       if (computedColor === 'rgb(255, 0, 0)' || parent.style.color === 'red') {
         hasRed = true;
       } else {
-        // Scan internal contents
         const fragment = range.cloneContents();
         const div = document.createElement('div');
         div.appendChild(fragment);
-        // Check for common red markers
         if (div.querySelector('[style*="color: red"]') || 
             div.querySelector('[style*="color: rgb(255, 0, 0)"]') ||
             div.querySelector('font[color="red"]')) {
@@ -650,6 +679,7 @@ function CommentViewer() {
     }
   }, []);
 
+  // Stable callbacks for memoized rows
   const toggleCellImplemented = useCallback((commentId, itemIndex, column) => {
     setComments((prevComments) => prevComments.map((comment) => {
       if (comment.id === commentId) {
@@ -692,26 +722,12 @@ function CommentViewer() {
   }, [history, historyIndex]);
 
   const insertTextToWord = useCallback(async (htmlContent) => {
-    if (!officeReady) {
-      console.warn("Office not ready");
-      return;
-    }
-    
-    if (!htmlContent) {
-      return;
-    }
-    
+    if (!officeReady || !htmlContent) return;
     try {
       await Word.run(async (context) => {
         const selection = context.document.getSelection();
-        
-        let cleanHtml = htmlContent || "";
-        // Replace custom degree placeholder with non-breaking space
-        cleanHtml = cleanHtml.replace(/°/g, '&nbsp;');
-        
-        // Explicitly wrap in Georgia 12pt span
+        let cleanHtml = htmlContent.replace(/°/g, '&nbsp;');
         const wrappedHtml = `<span style="font-family: 'Georgia', serif; font-size: 12pt;">${cleanHtml}</span>`;
-        
         selection.insertHtml(wrappedHtml, Word.InsertLocation.replace);
         await context.sync();
       });
@@ -735,7 +751,6 @@ function CommentViewer() {
         }
       }
     };
-
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [undo, redo]);
@@ -751,26 +766,20 @@ function CommentViewer() {
 
   useEffect(() => {
     if (!officeReady || comments.length === 0) return;
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     setSaveStatus("idle");
     saveTimeoutRef.current = setTimeout(() => {
       saveCommentsToWordSilent();
     }, AUTO_SAVE_DELAY);
-
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [comments, officeReady]);
 
+  // OPTIMIZED BATCH LOADING
   async function loadCommentsFromWord() {
     setLoading(true);
-    setLoadingProgress(0); // Reset progress
+    setLoadingProgress(0);
     try {
       await Word.run(async (context) => {
         const wordComments = context.document.body.getComments();
@@ -781,24 +790,17 @@ function CommentViewer() {
         const total = items.length;
         const commentData = [];
         
-        // Process in chunks to allow progress updates and prevent timeouts
         const CHUNK_SIZE = 50; 
         for (let i = 0; i < total; i += CHUNK_SIZE) {
             const chunk = items.slice(i, i + CHUNK_SIZE);
-            
-            // 1. Queue commands
-            // We need to keep track of the ranges to read them later
             const ranges = chunk.map(c => {
                 c.load("content");
                 const r = c.getRange();
                 r.load("start");
                 return r;
             });
-
-            // 2. Sync to execute commands
             await context.sync();
 
-            // 3. Read results
             chunk.forEach((comment, index) => {
                 const range = ranges[index];
                 const content = comment.content;
@@ -811,7 +813,6 @@ function CommentViewer() {
                     try {
                         tableData = JSON.parse(parts[1]);
                     } catch (e) {
-                        console.error("Error parsing comment data:", e);
                         tableData = { items: [createEmptyItem()] };
                     }
                 } else {
@@ -821,13 +822,11 @@ function CommentViewer() {
 
                 commentData.push({
                     id: commentId,
-                    position: range.start, // Access loaded property
+                    position: range.start,
                     location: "Position " + range.start,
                     items: tableData.items
                 });
             });
-
-            // Update progress
             setLoadingProgress(Math.round(((i + chunk.length) / total) * 100));
         }
 
@@ -849,34 +848,48 @@ function CommentViewer() {
     }
   }
 
+  // OPTIMIZED BATCH SAVE
   async function saveCommentsToWordSilent() {
     if (!officeReady) return;
 
     setSaveStatus("saving");
     try {
       await Word.run(async (context) => {
+        // 1. Load all comments and contents in ONE batch
         const wordComments = context.document.body.getComments();
-        wordComments.load("items");
+        wordComments.load("items/content");
         await context.sync();
 
+        let hasChanges = false;
+
+        // 2. Iterate in memory
         for (let i = 0; i < wordComments.items.length; i++) {
           const wordComment = wordComments.items[i];
-          wordComment.load("content");
-          await context.sync();
-
           const currentContent = wordComment.content;
-          const commentId = currentContent.includes("|||") ? currentContent.split("|||")[0] : currentContent;
+          
+          let commentId = currentContent;
+          if (currentContent.includes("|||")) {
+             commentId = currentContent.split("|||")[0];
+          }
+
+          // Find React counterpart
           const ourComment = comments.find((c) => c.id === commentId);
 
+          // 3. Queue update only if changed
           if (ourComment) {
             const newContent = ourComment.id + "|||" + JSON.stringify({ items: ourComment.items });
-            if (wordComment.content !== newContent) {
+            if (currentContent !== newContent) {
               wordComment.content = newContent;
+              hasChanges = true;
             }
           }
         }
 
-        await context.sync();
+        // 4. Sync only if changes existed
+        if (hasChanges) {
+          await context.sync();
+        }
+        
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       });
@@ -892,23 +905,19 @@ function CommentViewer() {
       alert("Please wait for Office to finish loading");
       return;
     }
-
     try {
       await Word.run(async (context) => {
         const range = context.document.getSelection();
         range.load("text");
         await context.sync();
-
         if (range.text.length === 0) {
           alert("Please select some text first!");
           return;
         }
-
         let locationText = range.text.substring(0, LOCATION_PREVIEW_LENGTH);
         if (range.text.length > LOCATION_PREVIEW_LENGTH) {
           locationText += "...";
         }
-
         setNewCommentLocation('Text: "' + locationText + '"');
         setShowCreateDialog(true);
       });
@@ -927,31 +936,24 @@ function CommentViewer() {
       alert("A comment with this ID already exists!");
       return;
     }
-
     try {
       await Word.run(async (context) => {
         const range = context.document.getSelection();
         range.insertComment(newCommentId);
         await context.sync();
-
         const timestamp = new Date();
         const newComment = {
           id: newCommentId,
           location: newCommentLocation,
-          timestamp: timestamp.toISOString().split("T")[0] + " " + timestamp.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
           items: [createEmptyItem()]
         };
-
         const updatedComments = [...comments, newComment];
         setComments(updatedComments);
         saveToHistory(updatedComments);
-
         setExpandedComments((prev) => new Set([...prev, newCommentId]));
-
         setShowCreateDialog(false);
         setNewCommentId("");
         setNewCommentLocation("");
-
         alert("Comment created successfully!");
       });
     } catch (error) {
@@ -966,16 +968,13 @@ function CommentViewer() {
         const wordComments = context.document.body.getComments();
         wordComments.load("items");
         await context.sync();
-
         let found = false;
         for (let i = 0; i < wordComments.items.length; i++) {
           const comment = wordComments.items[i];
           comment.load("content");
           await context.sync();
-
           const content = comment.content;
           const actualCommentId = content.includes("|||") ? content.split("|||")[0] : content;
-
           if (actualCommentId === commentId) {
             const range = comment.getRange();
             range.select();
@@ -983,7 +982,6 @@ function CommentViewer() {
             break;
           }
         }
-
         if (!found) {
           alert("Could not find this comment in the document.");
         }
@@ -996,19 +994,16 @@ function CommentViewer() {
 
   const filteredComments = useMemo(() => {
     if (!debouncedSearchQuery.trim()) return comments;
-
     const query = debouncedSearchQuery.toLowerCase();
     return comments.filter((comment) => {
       if (comment.id.toLowerCase().includes(query)) return true;
       if (comment.location.toLowerCase().includes(query)) return true;
-
       return comment.items.some((item) => {
         const stripHtml = (html) => {
           const temp = document.createElement("div");
           temp.innerHTML = html || "";
           return temp.textContent || temp.innerText || "";
         };
-
         return (
           (item.id && item.id.toLowerCase().includes(query)) ||
           stripHtml(item.admin).toLowerCase().includes(query) ||
@@ -1087,17 +1082,14 @@ function CommentViewer() {
       setShowUsernameDialog(true);
       return;
     }
-
     setComments((prevComments) => prevComments.map((comment) => {
       if (comment.id === commentId) {
         const newItems = [...comment.items];
         const updatedItem = {...newItems[itemIndex], [column]: value};
-
         if (currentUsername && column !== "id" && column !== "isHeading" && !column.startsWith("_")) {
           const editorKey = "_" + column + "Editor";
           updatedItem[editorKey] = currentUsername;
         }
-
         newItems[itemIndex] = updatedItem;
         return {...comment, items: newItems};
       }
@@ -1110,7 +1102,6 @@ function CommentViewer() {
       const username = tempUsername.trim();
       setCurrentUsername(username);
       setShowUsernameDialog(false);
-
       if (pendingEditRef.current) {
         const pending = pendingEditRef.current;
         setComments((prevComments) => prevComments.map((comment) => {
@@ -1345,34 +1336,22 @@ function CommentViewer() {
                       </tr>
                     </thead>
                     <tbody>
-                      {comment.items.map((item, idx) => {
-                        const rowBgClass = item.isHeading ? "bg-[#FEF9C3]" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50");
-                        return (
-                        <tr key={idx} className={`group ${rowBgClass} transition-colors`}>
-                          <td className="px-1 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "40px", width: "40px" }}>
-                            <input type="text" value={item.id} onChange={(e) => updateCell(comment.id, idx, "id", e.target.value)} className={"w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs" + (item.isHeading ? " font-bold" : "")} placeholder="#" />
-                          </td>
-                          {columns.map((col) => (
-                            !collapsedColumns.has(col.key) ? (
-                              <td key={col.key} className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}>
-                                <button onClick={(e) => { e.stopPropagation(); toggleCellImplemented(comment.id, idx, col.key); }} className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")} style={{ zIndex: 20, cursor: "pointer" }} title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
-                                <div className={item.isHeading ? "font-semibold" : ""}>
-                                  <MemoizedRichTextCell value={item[col.key]} onChange={(html) => updateCell(comment.id, idx, col.key, html)} placeholder="—" column={col.key} commentId={comment.id} itemIndex={idx} addRowAfter={addRowAfter} />
-                                </div>
-                              </td>
-                            ) : null
-                          ))}
-                          {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
-                          <td className="px-1 py-0 align-top">
-                            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col gap-0 py-0.5">
-                              <button onClick={() => addRowAfter(comment.id, idx)} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors" title="Add row below">+</button>
-                              <button onClick={() => toggleHeading(comment.id, idx)} className={"w-5 h-4 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-[#C99700] text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")} title="Toggle heading">H</button>
-                              <button onClick={() => setDeleteConfirm({ commentId: comment.id, itemIndex: idx })} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors" title="Delete row">×</button>
-                            </div>
-                          </td>
-                        </tr>
-                        );
-                      })}
+                      {comment.items.map((item, idx) => (
+                        <CommentRow 
+                          key={idx} 
+                          item={item} 
+                          idx={idx} 
+                          commentId={comment.id} 
+                          columns={columns}
+                          collapsedColumns={collapsedColumns}
+                          updateCell={updateCell}
+                          toggleCellImplemented={toggleCellImplemented}
+                          insertTextToWord={insertTextToWord}
+                          addRowAfter={addRowAfter}
+                          toggleHeading={toggleHeading}
+                          setDeleteConfirm={setDeleteConfirm}
+                        />
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -1384,7 +1363,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v56</span>
+        <span>v57</span>
       </div>
     </div>
   );
