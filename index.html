@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v57</title>
+<title>Law Review Comment Viewer - v58</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -17,8 +17,12 @@ body {
   font-family: Helvetica, Arial, sans-serif;
   background: #f8f9fa;
 }
-[contenteditable] { outline: none; }
-[contenteditable]:focus { background-color: #f0f0f0; }
+/* Only show outline when editing */
+[contenteditable="true"] { outline: none; }
+[contenteditable="true"]:focus { background-color: #f0f0f0; }
+/* Visual cue for read-only vs editable */
+.read-only-cell { cursor: default; }
+.editable-cell { cursor: text; }
 
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -30,18 +34,16 @@ body {
   to { opacity: 1; }
 }
 .fade-in { animation: fadeIn 0.2s ease-in; }
-.save-indicator { transition: opacity 0.3s ease; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 57");
+console.log("Law Review Add-in Version 58 - Edit/Save Workflow");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-const AUTO_SAVE_DELAY = 2000;
 const LOCATION_PREVIEW_LENGTH = 50;
 const MAX_HISTORY_SIZE = 50;
 const DEBOUNCE_DELAY = 300;
@@ -71,57 +73,40 @@ function createEmptyItem() {
   };
 }
 
-function ChevronDown() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="6 9 12 15 18 9"></polyline>
-    </svg>
-  );
-}
-
-function ChevronUp() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="18 15 12 9 6 15"></polyline>
-    </svg>
-  );
-}
-
-function ClipboardIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-    </svg>
-  );
-}
-
-function SaveIndicator({ status }) {
-  if (status === "saving") {
-    return (
-      <span className="save-indicator text-xs text-[#C99700] opacity-100" style={{ display: 'inline-block', width: '16px', height: '16px' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-          <polyline points="17 21 17 13 7 13 7 21"></polyline>
-          <polyline points="7 3 7 8 15 8"></polyline>
-        </svg>
-      </span>
-    );
-  }
-  if (status === "saved") {
-    return <span className="save-indicator text-xs text-[#4ADE80] opacity-100">✓</span>;
-  }
-  if (status === "error") {
-    return <span className="save-indicator text-xs text-red-300 opacity-100">⚠</span>;
-  }
-  return <span className="save-indicator text-xs opacity-0"></span>;
-}
+// Icons
+const ChevronDown = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>
+);
+const ChevronUp = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="18 15 12 9 6 15"></polyline>
+  </svg>
+);
+const ClipboardIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1-2-2h2"></path>
+    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+  </svg>
+);
+const EditIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+  </svg>
+);
+const SaveIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+    <polyline points="7 3 7 8 15 8"></polyline>
+  </svg>
+);
 
 // --- Helper to auto-linkify text ---
 function transformTextToLinks(html) {
   if (!html) return html;
-  
-  // Create a temporary container to safely traverse text nodes
   const temp = document.createElement('div');
   temp.innerHTML = html;
   
@@ -129,14 +114,12 @@ function transformTextToLinks(html) {
   const nodesToProcess = [];
   let node;
   
-  // Collect eligible text nodes (skip those already inside <a> tags)
   while(node = walker.nextNode()) {
     if (node.parentElement.tagName === 'A') continue;
     nodesToProcess.push(node);
   }
   
   let modified = false;
-  
   nodesToProcess.forEach(textNode => {
     let text = textNode.textContent;
     let newHtml = text;
@@ -156,12 +139,9 @@ function transformTextToLinks(html) {
       const chNum = parseInt(ch, 10);
       const chPad = String(chNum).padStart(2, '0');
       const secPad = String(sec).padStart(3, '0');
-      
-      // Determine Part based on Chapter (Ed 18 structure approximation)
       let part = 'part1';
       if (chNum >= 5 && chNum <= 10) part = 'part2';
       else if (chNum >= 11 && chNum <= 16) part = 'part3';
-      
       const url = `https://www-chicagomanualofstyle-org.proxy.library.nd.edu/book/ed18/${part}/ch${chPad}/psec${secPad}.html`;
       return `<a href="${url}" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
     });
@@ -179,11 +159,10 @@ function transformTextToLinks(html) {
       textNode.parentNode.replaceChild(span, textNode);
     }
   });
-  
   return modified ? temp.innerHTML : html;
 }
 
-function RichTextCell({ value, onChange, placeholder, column, commentId, itemIndex, addRowAfter }) {
+function RichTextCell({ value, onChange, placeholder, column, commentId, itemIndex, addRowAfter, isEditing }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
@@ -191,26 +170,26 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     if (editorRef.current && !editorRef.current.innerHTML) {
       editorRef.current.innerHTML = value || "";
     }
-  }, [value]);
+  }, []); // Only run once on mount
 
+  // Sync value changes if not currently updating
   useEffect(() => {
     if (editorRef.current && !isUpdatingRef.current && document.activeElement !== editorRef.current) {
-      if (editorRef.current.innerHTML !== value && value !== undefined) {
+      if (editorRef.current.innerHTML !== (value || "")) {
         editorRef.current.innerHTML = value || "";
       }
     }
   }, [value]);
 
   const handleInput = useCallback((e) => {
+    if (!isEditing) return;
     isUpdatingRef.current = true;
     let rawHtml = e.target.innerHTML;
     
-    const hasNbsp = /\u00A0|&nbsp;/i.test(rawHtml);
-    
-    if (hasNbsp) {
+    // Nbsp to custom placeholder
+    if (/\u00A0|&nbsp;/i.test(rawHtml)) {
       const sel = window.getSelection();
       let cursorOffset = 0;
-      
       if (sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
         const preCaretRange = range.cloneRange();
@@ -219,8 +198,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         cursorOffset = preCaretRange.toString().length;
       }
       
-      rawHtml = rawHtml.replace(/\u00A0/g, '°');
-      rawHtml = rawHtml.replace(/&nbsp;/gi, '°');
+      rawHtml = rawHtml.replace(/\u00A0/g, '°').replace(/&nbsp;/gi, '°');
       e.target.innerHTML = rawHtml;
       
       if (sel.rangeCount > 0) {
@@ -245,9 +223,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             }
           }
         };
-        
         walkNodes(e.target);
-        
         if (found) {
           sel.removeAllRanges();
           sel.addRange(newRange);
@@ -257,10 +233,10 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
     
     onChange(rawHtml);
     isUpdatingRef.current = false;
-  }, [onChange]);
+  }, [onChange, isEditing]);
 
   const handleBlur = useCallback(() => {
-    if (editorRef.current) {
+    if (editorRef.current && isEditing) {
         const currentHtml = editorRef.current.innerHTML;
         const linkedHtml = transformTextToLinks(currentHtml);
         if (linkedHtml !== currentHtml) {
@@ -268,9 +244,10 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
             onChange(linkedHtml);
         }
     }
-  }, [onChange]);
+  }, [onChange, isEditing]);
 
   const handlePaste = useCallback((e) => {
+    if (!isEditing) return;
     e.preventDefault();
     const html = e.clipboardData.getData("text/html");
 
@@ -283,56 +260,41 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
           const text = node.textContent.replace(/\u00A0/g, '°');
           return document.createTextNode(text);
         }
-
         if (node.nodeType === Node.ELEMENT_NODE) {
           const tagName = node.tagName.toLowerCase();
           const style = node.style;
           const styleAttr = node.getAttribute("style") || "";
           
-          const isBold = tagName === "b" || tagName === "strong" ||
-            style.fontWeight === "bold" || style.fontWeight === "700" ||
-            styleAttr.includes("font-weight: bold") || styleAttr.includes("font-weight:bold");
-          const isItalic = tagName === "i" || tagName === "em" ||
-            style.fontStyle === "italic" ||
-            styleAttr.includes("font-style: italic") || styleAttr.includes("font-style:italic");
+          const isBold = tagName === "b" || tagName === "strong" || style.fontWeight === "bold" || style.fontWeight === "700" || styleAttr.includes("font-weight: bold");
+          const isItalic = tagName === "i" || tagName === "em" || style.fontStyle === "italic" || styleAttr.includes("font-style: italic");
 
           const children = Array.from(node.childNodes).map(processNode);
-
           let resultElement = null;
           
-          // Reconstruct element nesting
           if (isItalic) {
             const em = document.createElement("em");
             children.forEach((child) => em.appendChild(child));
             resultElement = em;
           }
-          
           if (isBold) {
             const strong = document.createElement("strong");
-            if (resultElement) {
-              strong.appendChild(resultElement);
-            } else {
-              children.forEach((child) => strong.appendChild(child));
-            }
+            if (resultElement) strong.appendChild(resultElement);
+            else children.forEach((child) => strong.appendChild(child));
             resultElement = strong;
           }
           
-          if (resultElement) {
-            return resultElement;
-          } else {
+          if (resultElement) return resultElement;
+          else {
             const fragment = document.createDocumentFragment();
             children.forEach((child) => fragment.appendChild(child));
             return fragment;
           }
         }
-
         return document.createTextNode("");
       };
 
       const processed = document.createDocumentFragment();
-      Array.from(temp.childNodes).forEach((node) => {
-        processed.appendChild(processNode(node));
-      });
+      Array.from(temp.childNodes).forEach((node) => processed.appendChild(processNode(node)));
 
       const selection = window.getSelection();
       if (selection.rangeCount > 0) {
@@ -343,7 +305,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
         selection.removeAllRanges();
         selection.addRange(range);
       }
-      
       if (editorRef.current) {
         editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
       }
@@ -352,17 +313,15 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       const convertedText = text.replace(/\u00A0/g, '°');
       document.execCommand("insertText", false, convertedText);
     }
-  }, []);
+  }, [isEditing]);
 
   const handleKeyDown = useCallback((e) => {
-    // Degree symbol shortcut
+    if (!isEditing) return;
     if (e.key === ' ' && (e.altKey || (e.ctrlKey && e.shiftKey))) {
       e.preventDefault();
       document.execCommand("insertText", false, "°");
       return;
     }
-
-    // Bold/Italic/Underline shortcuts
     if ((e.metaKey || e.ctrlKey) && e.key === "b") {
       e.preventDefault();
       document.execCommand("bold", false, null);
@@ -378,8 +337,6 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       document.execCommand("underline", false, null);
       return;
     }
-
-    // Shift+Enter: New Row + Focus
     if (e.shiftKey && e.key === "Enter") {
       e.preventDefault();
       if (addRowAfter && commentId && itemIndex !== undefined) {
@@ -405,40 +362,35 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       }
       return;
     }
-
-    // Tab: Move Down (Shift+Tab: Move Up)
     if (e.key === "Tab") {
       e.preventDefault();
       const allCells = Array.from(document.querySelectorAll('[data-cell-column="' + column + '"]'));
       const currentIndex = allCells.indexOf(editorRef.current);
       const nextIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
-
       if (nextIndex >= 0 && nextIndex < allCells.length) {
         const nextCell = allCells[nextIndex];
         nextCell.focus();
-        
-        // Select all content in target cell
         const range = document.createRange();
         const sel = window.getSelection();
         range.selectNodeContents(nextCell);
-        range.collapse(false); // Collapse to end if preferred, or remove to keep selected
+        range.collapse(false);
         sel.removeAllRanges();
         sel.addRange(range);
       }
     }
-  }, [column, addRowAfter, commentId, itemIndex]);
+  }, [column, addRowAfter, commentId, itemIndex, isEditing]);
 
   return (
     <div className="relative w-full" style={{ paddingRight: "20px" }}>
       <div
         ref={editorRef}
-        contentEditable
+        contentEditable={isEditing}
         onInput={handleInput}
         onBlur={handleBlur}
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         data-cell-column={column}
-        className="w-full min-h-[1.4rem] bg-transparent focus:bg-gray-100 focus:ring-1 focus:ring-gray-400 rounded px-1 py-0.5 cursor-text leading-tight"
+        className={`w-full min-h-[1.4rem] bg-transparent rounded px-1 py-0.5 leading-tight ${isEditing ? 'cursor-text focus:bg-gray-100 focus:ring-1 focus:ring-gray-400' : 'cursor-default'}`}
         style={{
           wordWrap: "break-word",
           whiteSpace: "pre-wrap",
@@ -458,22 +410,31 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
 
 const MemoizedRichTextCell = React.memo(RichTextCell);
 
-// --- NEW MEMOIZED ROW COMPONENT ---
-const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns, updateCell, toggleCellImplemented, insertTextToWord, addRowAfter, toggleHeading, setDeleteConfirm }) => {
+// --- MEMOIZED ROW COMPONENT ---
+const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns, updateCell, toggleCellImplemented, insertTextToWord, addRowAfter, toggleHeading, setDeleteConfirm, isEditing }) => {
   const rowBgClass = item.isHeading ? "bg-[#FEF9C3]" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50");
-  
-  // Handlers for this specific row to avoid recreating functions in render
   const handleIdChange = (e) => updateCell(commentId, idx, "id", e.target.value);
   
   return (
     <tr className={`group ${rowBgClass} transition-colors`}>
       <td className="px-1 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "40px", width: "40px" }}>
-        <input type="text" value={item.id} onChange={handleIdChange} className={"w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs" + (item.isHeading ? " font-bold" : "")} placeholder="#" />
+        <input 
+          type="text" 
+          value={item.id} 
+          onChange={handleIdChange} 
+          disabled={!isEditing}
+          className={"w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs" + (item.isHeading ? " font-bold" : "")} 
+          placeholder="#" 
+        />
       </td>
       {columns.map((col) => (
         !collapsedColumns.has(col.key) ? (
           <td key={col.key} className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}>
-            <button onClick={(e) => { e.stopPropagation(); toggleCellImplemented(commentId, idx, col.key); }} className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")} style={{ zIndex: 20, cursor: "pointer" }} title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); toggleCellImplemented(commentId, idx, col.key); }} 
+              disabled={!isEditing}
+              className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300") + (!isEditing ? " opacity-50 cursor-not-allowed" : " cursor-pointer")} 
+              title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
             <div className={item.isHeading ? "font-semibold" : ""}>
               <MemoizedRichTextCell 
                 value={item[col.key]} 
@@ -483,6 +444,7 @@ const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns
                 commentId={commentId}
                 itemIndex={idx}
                 addRowAfter={addRowAfter}
+                isEditing={isEditing}
               />
             </div>
           </td>
@@ -490,11 +452,13 @@ const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns
       ))}
       {collapsedColumns.size > 0 && <td className="border-r border-gray-200"></td>}
       <td className="px-1 py-0 align-top">
-        <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col gap-0 py-0.5">
-          <button onClick={() => addRowAfter(commentId, idx)} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors" title="Add row below">+</button>
-          <button onClick={() => toggleHeading(commentId, idx)} className={"w-5 h-4 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-[#C99700] text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")} title="Toggle heading">H</button>
-          <button onClick={() => setDeleteConfirm({ commentId: commentId, itemIndex: idx })} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors" title="Delete row">×</button>
-        </div>
+        {isEditing && (
+          <div className="flex flex-col gap-0 py-0.5">
+            <button onClick={() => addRowAfter(commentId, idx)} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded text-gray-600 text-xs transition-colors" title="Add row below">+</button>
+            <button onClick={() => toggleHeading(commentId, idx)} className={"w-5 h-4 flex items-center justify-center rounded text-xs transition-colors" + (item.isHeading ? " bg-[#C99700] text-white" : " bg-gray-100 hover:bg-gray-200 text-gray-600")} title="Toggle heading">H</button>
+            <button onClick={() => setDeleteConfirm({ commentId: commentId, itemIndex: idx })} className="w-5 h-4 flex items-center justify-center bg-gray-100 hover:bg-red-100 hover:text-red-600 rounded text-gray-600 text-xs transition-colors" title="Delete row">×</button>
+          </div>
+        )}
       </td>
     </tr>
   );
@@ -510,9 +474,7 @@ function CommentViewer() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newCommentId, setNewCommentId] = useState("");
   const [newCommentLocation, setNewCommentLocation] = useState("");
-  const [saveStatus, setSaveStatus] = useState("idle");
   const [smartPasteContent, setSmartPasteContent] = useState("");
-  const saveTimeoutRef = useRef(null);
   const commentIdInputRef = useRef(null);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -528,6 +490,8 @@ function CommentViewer() {
   const pendingEditRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [editingCommentIds, setEditingCommentIds] = useState(new Set()); // New state for editing
+  const [savingCommentId, setSavingCommentId] = useState(null); // Track saving state per comment
 
   const debouncedSearchQuery = useDebounce(searchQuery, DEBOUNCE_DELAY);
 
@@ -562,7 +526,6 @@ function CommentViewer() {
               .replace(/</g, '&lt;')
               .replace(/>/g, '&gt;');
           }
-          
           if (node.nodeType === Node.ELEMENT_NODE) {
             const tagName = node.tagName.toLowerCase();
             const style = node.style;
@@ -574,18 +537,9 @@ function CommentViewer() {
                 return `<a href="${href}">${content}</a>`;
             }
 
-            const isBold = tagName === "b" || tagName === "strong" ||
-              style.fontWeight === "bold" || style.fontWeight === "700" ||
-              styleAttr.includes("font-weight: bold") || styleAttr.includes("font-weight:bold");
-              
-            const isItalic = tagName === "i" || tagName === "em" ||
-              style.fontStyle === "italic" ||
-              styleAttr.includes("font-style: italic");
-            
-            const isRed = style.color === "red" || 
-                          style.color === "rgb(255, 0, 0)" || 
-                          styleAttr.includes("color: red") ||
-                          styleAttr.includes("color:red");
+            const isBold = tagName === "b" || tagName === "strong" || style.fontWeight === "bold" || style.fontWeight === "700" || styleAttr.includes("font-weight: bold");
+            const isItalic = tagName === "i" || tagName === "em" || style.fontStyle === "italic" || styleAttr.includes("font-style: italic");
+            const isRed = style.color === "red" || style.color === "rgb(255, 0, 0)" || styleAttr.includes("color: red");
 
             let childHTML = "";
             for (const child of node.childNodes) {
@@ -764,22 +718,67 @@ function CommentViewer() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!officeReady || comments.length === 0) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    setSaveStatus("idle");
-    saveTimeoutRef.current = setTimeout(() => {
-      saveCommentsToWordSilent();
-    }, AUTO_SAVE_DELAY);
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
+  // --- EDIT & SAVE LOGIC ---
+  const handleEditComment = useCallback((commentId) => {
+    setEditingCommentIds(prev => new Set(prev).add(commentId));
+  }, []);
+
+  const handleSaveComment = useCallback(async (commentId) => {
+    if (!officeReady) return;
+    
+    // Find the comment data in React state
+    const commentData = comments.find(c => c.id === commentId);
+    if (!commentData) return;
+
+    setSavingCommentId(commentId);
+    try {
+      await Word.run(async (context) => {
+        // Load only what we need: content of items
+        const wordComments = context.document.body.getComments();
+        wordComments.load("items/content");
+        await context.sync();
+
+        // Scan for the matching ID in Word's comments
+        let targetWordComment = null;
+        for (let i = 0; i < wordComments.items.length; i++) {
+            const wc = wordComments.items[i];
+            const content = wc.content;
+            const cid = content.includes("|||") ? content.split("|||")[0] : content;
+            if (cid === commentId) {
+                targetWordComment = wc;
+                break;
+            }
+        }
+
+        if (targetWordComment) {
+            // Update the content
+            const newContent = commentId + "|||" + JSON.stringify({ items: commentData.items });
+            targetWordComment.content = newContent;
+            await context.sync();
+            
+            // Remove from editing set only on success
+            setEditingCommentIds(prev => {
+                const next = new Set(prev);
+                next.delete(commentId);
+                return next;
+            });
+        } else {
+            alert("Could not find this comment in the Word document. It may have been deleted.");
+        }
+      });
+    } catch (error) {
+      console.error("Error saving comment:", error);
+      alert("Failed to save comment.");
+    } finally {
+      setSavingCommentId(null);
+    }
   }, [comments, officeReady]);
 
   // OPTIMIZED BATCH LOADING
   async function loadCommentsFromWord() {
     setLoading(true);
     setLoadingProgress(0);
+    setEditingCommentIds(new Set()); // Reset editing state on refresh
     try {
       await Word.run(async (context) => {
         const wordComments = context.document.body.getComments();
@@ -848,58 +847,6 @@ function CommentViewer() {
     }
   }
 
-  // OPTIMIZED BATCH SAVE
-  async function saveCommentsToWordSilent() {
-    if (!officeReady) return;
-
-    setSaveStatus("saving");
-    try {
-      await Word.run(async (context) => {
-        // 1. Load all comments and contents in ONE batch
-        const wordComments = context.document.body.getComments();
-        wordComments.load("items/content");
-        await context.sync();
-
-        let hasChanges = false;
-
-        // 2. Iterate in memory
-        for (let i = 0; i < wordComments.items.length; i++) {
-          const wordComment = wordComments.items[i];
-          const currentContent = wordComment.content;
-          
-          let commentId = currentContent;
-          if (currentContent.includes("|||")) {
-             commentId = currentContent.split("|||")[0];
-          }
-
-          // Find React counterpart
-          const ourComment = comments.find((c) => c.id === commentId);
-
-          // 3. Queue update only if changed
-          if (ourComment) {
-            const newContent = ourComment.id + "|||" + JSON.stringify({ items: ourComment.items });
-            if (currentContent !== newContent) {
-              wordComment.content = newContent;
-              hasChanges = true;
-            }
-          }
-        }
-
-        // 4. Sync only if changes existed
-        if (hasChanges) {
-          await context.sync();
-        }
-        
-        setSaveStatus("saved");
-        setTimeout(() => setSaveStatus("idle"), 2000);
-      });
-    } catch (error) {
-      console.error("Error auto-saving:", error);
-      setSaveStatus("error");
-      setTimeout(() => setSaveStatus("idle"), 3000);
-    }
-  }
-
   async function createNewCommentFromSelection() {
     if (!officeReady) {
       alert("Please wait for Office to finish loading");
@@ -951,6 +898,8 @@ function CommentViewer() {
         setComments(updatedComments);
         saveToHistory(updatedComments);
         setExpandedComments((prev) => new Set([...prev, newCommentId]));
+        // Auto-enable editing for new comment
+        setEditingCommentIds(prev => new Set(prev).add(newCommentId));
         setShowCreateDialog(false);
         setNewCommentId("");
         setNewCommentLocation("");
@@ -1295,6 +1244,25 @@ function CommentViewer() {
                     <span className="text-gray-600">{comment.location}</span>
                   </div>
                 </div>
+                {/* Header Edit/Save Controls */}
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                  {editingCommentIds.has(comment.id) ? (
+                    <button 
+                      onClick={() => handleSaveComment(comment.id)} 
+                      disabled={savingCommentId === comment.id}
+                      className="flex items-center gap-1 px-2 py-0.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors"
+                    >
+                      {savingCommentId === comment.id ? "Saving..." : <><SaveIcon /> Save</>}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleEditComment(comment.id)} 
+                      className="flex items-center gap-1 px-2 py-0.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs font-medium transition-colors"
+                    >
+                      <EditIcon /> Edit
+                    </button>
+                  )}
+                </div>
               </div>
 
               {expandedComments.has(comment.id) && (
@@ -1350,6 +1318,7 @@ function CommentViewer() {
                           addRowAfter={addRowAfter}
                           toggleHeading={toggleHeading}
                           setDeleteConfirm={setDeleteConfirm}
+                          isEditing={editingCommentIds.has(comment.id)}
                         />
                       ))}
                     </tbody>
@@ -1363,7 +1332,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v57</span>
+        <span>v58</span>
       </div>
     </div>
   );
