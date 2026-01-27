@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v60</title>
+<title>Law Review Comment Viewer - v61</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -40,11 +40,10 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 60 - Focus Fixes");
+console.log("Law Review Add-in Version 61 - Manual Save & Z-Index Fix");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-const AUTO_SAVE_DELAY = 2000;
 const LOCATION_PREVIEW_LENGTH = 50;
 const MAX_HISTORY_SIZE = 50;
 const DEBOUNCE_DELAY = 300;
@@ -415,7 +414,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
              sel.removeAllRanges();
              sel.addRange(range);
            }
-        }, 50);
+        }, 100);
       }
       return;
     }
@@ -490,10 +489,7 @@ const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns
       {columns.map((col) => (
         !collapsedColumns.has(col.key) ? (
           <td key={col.key} className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}>
-            <button 
-              onClick={(e) => { e.stopPropagation(); toggleCellImplemented(commentId, idx, col.key); }} 
-              className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors cursor-pointer" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")}
-              title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
+            {/* DOM Order Swap: Content first, Button second to ensure button is on top */}
             <div className={item.isHeading ? "font-semibold" : ""}>
               <MemoizedRichTextCell 
                 value={item[col.key]} 
@@ -507,6 +503,10 @@ const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns
                 cellId={`cell-${commentId}-${idx}-${col.key}`}
               />
             </div>
+            <button 
+              onClick={(e) => { e.stopPropagation(); toggleCellImplemented(commentId, idx, col.key); }} 
+              className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors cursor-pointer z-10" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")}
+              title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
           </td>
         ) : null
       ))}
@@ -1139,6 +1139,8 @@ function CommentViewer() {
       saveToHistory(newComments);
       return newComments;
     });
+    // Trigger Edit Mode on deletion so user can save the removal
+    setEditingCommentIds(prev => new Set(prev).add(commentId));
     setDeleteConfirm(null);
   }, [saveToHistory]);
 
@@ -1385,7 +1387,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v60</span>
+        <span>v61</span>
       </div>
     </div>
   );
