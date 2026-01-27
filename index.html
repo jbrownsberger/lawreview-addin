@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v59</title>
+<title>Law Review Comment Viewer - v60</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -40,7 +40,7 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 59 - Robust Edit/Save");
+console.log("Law Review Add-in Version 60 - Focus Fixes");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
@@ -224,7 +224,7 @@ function transformTextToLinks(html) {
   }
 }
 
-function RichTextCell({ value, onChange, placeholder, column, commentId, itemIndex, addRowAfter, isEditing }) {
+function RichTextCell({ value, onChange, placeholder, column, commentId, itemIndex, addRowAfter, isEditing, cellId }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
@@ -400,8 +400,22 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       e.preventDefault();
       if (addRowAfter && commentId && itemIndex !== undefined) {
         addRowAfter(commentId, itemIndex);
-        // Focus logic handled in parent render ref sync if needed, 
-        // but simplified here to just trigger row add.
+        
+        // Smart focus logic: target the next row's cell in this column
+        setTimeout(() => {
+           const nextId = `cell-${commentId}-${itemIndex + 1}-${column}`;
+           const el = document.getElementById(nextId);
+           if (el) {
+             el.focus();
+             // Select content? Usually default is just caret at start
+             const range = document.createRange();
+             const sel = window.getSelection();
+             range.selectNodeContents(el);
+             range.collapse(true); // Start
+             sel.removeAllRanges();
+             sel.addRange(range);
+           }
+        }, 50);
       }
       return;
     }
@@ -426,6 +440,7 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
   return (
     <div className="relative w-full" style={{ paddingRight: "20px" }}>
       <div
+        id={cellId}
         ref={editorRef}
         contentEditable={isEditing}
         onInput={handleInput}
@@ -477,8 +492,7 @@ const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns
           <td key={col.key} className={"px-1 py-0 text-gray-800 border-r border-gray-200 align-top relative" + (item["_" + col.key + "Implemented"] ? " bg-[#DCFCE7]" : "")}>
             <button 
               onClick={(e) => { e.stopPropagation(); toggleCellImplemented(commentId, idx, col.key); }} 
-              disabled={!isEditing}
-              className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300") + (!isEditing ? " opacity-50 cursor-not-allowed" : " cursor-pointer")} 
+              className={"absolute top-0 right-0 w-5 h-5 flex items-center justify-center rounded text-xs transition-colors cursor-pointer" + (item["_" + col.key + "Implemented"] ? " bg-[#00843D] text-white" : " bg-gray-200 text-gray-500 hover:bg-gray-300")}
               title={item["_" + col.key + "Implemented"] ? "Mark as not implemented" : "Mark as implemented"}>✓</button>
             <div className={item.isHeading ? "font-semibold" : ""}>
               <MemoizedRichTextCell 
@@ -490,6 +504,7 @@ const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns
                 itemIndex={idx}
                 addRowAfter={addRowAfter}
                 isEditing={isEditing}
+                cellId={`cell-${commentId}-${idx}-${col.key}`}
               />
             </div>
           </td>
@@ -679,6 +694,7 @@ function CommentViewer() {
     }
   }, []);
 
+  // Stable callbacks for memoized rows
   const toggleCellImplemented = useCallback((commentId, itemIndex, column) => {
     setComments((prevComments) => prevComments.map((comment) => {
       if (comment.id === commentId) {
@@ -690,6 +706,8 @@ function CommentViewer() {
       }
       return comment;
     }));
+    // Force edit mode for this comment so user sees they need to save
+    setEditingCommentIds(prev => new Set(prev).add(commentId));
   }, []);
 
   const saveToHistory = useCallback((newComments) => {
@@ -1367,7 +1385,7 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v59</span>
+        <span>v60</span>
       </div>
     </div>
   );
