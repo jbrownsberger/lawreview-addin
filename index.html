@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>Law Review Comment Viewer - v58</title>
+<title>Law Review Comment Viewer - v59</title>
 
 <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -40,13 +40,43 @@ body {
 <div id="root"></div>
 
 <script type="text/babel">
-console.log("Law Review Add-in Version 58 - Edit/Save Workflow");
+console.log("Law Review Add-in Version 59 - Robust Edit/Save");
 
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
+const AUTO_SAVE_DELAY = 2000;
 const LOCATION_PREVIEW_LENGTH = 50;
 const MAX_HISTORY_SIZE = 50;
 const DEBOUNCE_DELAY = 300;
+
+// --- Error Boundary Component ---
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("React Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 bg-red-50 text-red-800 border border-red-200 m-4 rounded">
+          <h2 className="font-bold mb-2">Something went wrong.</h2>
+          <p className="text-xs font-mono">{this.state.error?.toString()}</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Reload Add-in</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -86,7 +116,7 @@ const ChevronUp = () => (
 );
 const ClipboardIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1-2-2h2"></path>
+    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
   </svg>
 );
@@ -104,80 +134,109 @@ const SaveIcon = () => (
   </svg>
 );
 
+function SaveIndicator({ status }) {
+  if (status === "saving") {
+    return (
+      <span className="save-indicator text-xs text-[#C99700] opacity-100" style={{ display: 'inline-block', width: '16px', height: '16px' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+      </span>
+    );
+  }
+  if (status === "saved") {
+    return <span className="save-indicator text-xs text-[#4ADE80] opacity-100">✓</span>;
+  }
+  if (status === "error") {
+    return <span className="save-indicator text-xs text-red-300 opacity-100">⚠</span>;
+  }
+  return <span className="save-indicator text-xs opacity-0"></span>;
+}
+
 // --- Helper to auto-linkify text ---
 function transformTextToLinks(html) {
   if (!html) return html;
-  const temp = document.createElement('div');
-  temp.innerHTML = html;
   
-  const walker = document.createTreeWalker(temp, NodeFilter.SHOW_TEXT, null, false);
-  const nodesToProcess = [];
-  let node;
-  
-  while(node = walker.nextNode()) {
-    if (node.parentElement.tagName === 'A') continue;
-    nodesToProcess.push(node);
-  }
-  
-  let modified = false;
-  nodesToProcess.forEach(textNode => {
-    let text = textNode.textContent;
-    let newHtml = text;
-    let nodeModified = false;
+  try {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
     
-    // 1. Bluebook Regex: BB 1.2
-    newHtml = newHtml.replace(/\bBB\s+(\d+(?:\.\d+)?)\b/g, (match, rule) => {
-      nodeModified = true;
-      modified = true;
-      return `<a href="https://www.legalbluebook.com/bluebook/search-results?search=${rule}&facet=whitepages" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
-    });
-    
-    // 2. CMOS Regex: CMOS 5.1
-    newHtml = newHtml.replace(/\bCMOS\s+(\d+)\.(\d+)\b/g, (match, ch, sec) => {
-      nodeModified = true;
-      modified = true;
-      const chNum = parseInt(ch, 10);
-      const chPad = String(chNum).padStart(2, '0');
-      const secPad = String(sec).padStart(3, '0');
-      let part = 'part1';
-      if (chNum >= 5 && chNum <= 10) part = 'part2';
-      else if (chNum >= 11 && chNum <= 16) part = 'part3';
-      const url = `https://www-chicagomanualofstyle-org.proxy.library.nd.edu/book/ed18/${part}/ch${chPad}/psec${secPad}.html`;
-      return `<a href="${url}" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
-    });
+    // Check if TreeWalker is supported
+    if (!document.createTreeWalker) return html;
 
-    // 3. Goldbook Regex: GB 104
-    newHtml = newHtml.replace(/\bGB\s+(\d+(?:\.\d+)?)\b/g, (match, rule) => {
-      nodeModified = true;
-      modified = true;
-      return `<a href="https://jbrownsberger.github.io/GoldbookWeb/#rule-${rule}" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
+    const walker = document.createTreeWalker(temp, NodeFilter.SHOW_TEXT, null, false);
+    const nodesToProcess = [];
+    let node;
+    
+    while(node = walker.nextNode()) {
+      if (node.parentElement && node.parentElement.tagName === 'A') continue;
+      nodesToProcess.push(node);
+    }
+    
+    let modified = false;
+    
+    nodesToProcess.forEach(textNode => {
+      let text = textNode.textContent;
+      let newHtml = text;
+      let nodeModified = false;
+      
+      // 1. Bluebook Regex: BB 1.2
+      newHtml = newHtml.replace(/\bBB\s+(\d+(?:\.\d+)?)\b/g, (match, rule) => {
+        nodeModified = true;
+        modified = true;
+        return `<a href="https://www.legalbluebook.com/bluebook/search-results?search=${rule}&facet=whitepages" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
+      });
+      
+      // 2. CMOS Regex: CMOS 5.1
+      newHtml = newHtml.replace(/\bCMOS\s+(\d+)\.(\d+)\b/g, (match, ch, sec) => {
+        nodeModified = true;
+        modified = true;
+        const chNum = parseInt(ch, 10);
+        const chPad = String(chNum).padStart(2, '0');
+        const secPad = String(sec).padStart(3, '0');
+        let part = 'part1';
+        if (chNum >= 5 && chNum <= 10) part = 'part2';
+        else if (chNum >= 11 && chNum <= 16) part = 'part3';
+        const url = `https://www-chicagomanualofstyle-org.proxy.library.nd.edu/book/ed18/${part}/ch${chPad}/psec${secPad}.html`;
+        return `<a href="${url}" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
+      });
+
+      // 3. Goldbook Regex: GB 104
+      newHtml = newHtml.replace(/\bGB\s+(\d+(?:\.\d+)?)\b/g, (match, rule) => {
+        nodeModified = true;
+        modified = true;
+        return `<a href="https://jbrownsberger.github.io/GoldbookWeb/#rule-${rule}" target="_blank" style="color: blue; text-decoration: underline;">${match}</a>`;
+      });
+      
+      if (nodeModified) {
+        const span = document.createElement('span');
+        span.innerHTML = newHtml;
+        textNode.parentNode.replaceChild(span, textNode);
+      }
     });
     
-    if (nodeModified) {
-      const span = document.createElement('span');
-      span.innerHTML = newHtml;
-      textNode.parentNode.replaceChild(span, textNode);
-    }
-  });
-  return modified ? temp.innerHTML : html;
+    return modified ? temp.innerHTML : html;
+  } catch (e) {
+    console.error("Link transform error", e);
+    return html;
+  }
 }
 
 function RichTextCell({ value, onChange, placeholder, column, commentId, itemIndex, addRowAfter, isEditing }) {
   const editorRef = useRef(null);
   const isUpdatingRef = useRef(false);
 
+  // Consolidated initialization and update logic
   useEffect(() => {
-    if (editorRef.current && !editorRef.current.innerHTML) {
-      editorRef.current.innerHTML = value || "";
-    }
-  }, []); // Only run once on mount
-
-  // Sync value changes if not currently updating
-  useEffect(() => {
-    if (editorRef.current && !isUpdatingRef.current && document.activeElement !== editorRef.current) {
-      if (editorRef.current.innerHTML !== (value || "")) {
-        editorRef.current.innerHTML = value || "";
-      }
+    if (!editorRef.current) return;
+    
+    // Initial set or external update (when not typing)
+    if (!isUpdatingRef.current && document.activeElement !== editorRef.current) {
+        if (editorRef.current.innerHTML !== (value || "")) {
+            editorRef.current.innerHTML = value || "";
+        }
     }
   }, [value]);
 
@@ -341,24 +400,8 @@ function RichTextCell({ value, onChange, placeholder, column, commentId, itemInd
       e.preventDefault();
       if (addRowAfter && commentId && itemIndex !== undefined) {
         addRowAfter(commentId, itemIndex);
-        setTimeout(() => {
-          const allCells = Array.from(document.querySelectorAll('[data-cell-column="' + column + '"]'));
-          const currentIndex = allCells.indexOf(editorRef.current);
-          const nextCell = allCells[currentIndex + 1];
-          if (nextCell) {
-            nextCell.focus();
-            const range = document.createRange();
-            const sel = window.getSelection();
-            if (nextCell.childNodes.length > 0) {
-              range.setStart(nextCell, 0);
-            } else {
-              range.setStart(nextCell, 0);
-            }
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-        }, 50);
+        // Focus logic handled in parent render ref sync if needed, 
+        // but simplified here to just trigger row add.
       }
       return;
     }
@@ -415,12 +458,14 @@ const CommentRow = React.memo(({ item, idx, commentId, columns, collapsedColumns
   const rowBgClass = item.isHeading ? "bg-[#FEF9C3]" : (idx % 2 === 0 ? "bg-white" : "bg-gray-50");
   const handleIdChange = (e) => updateCell(commentId, idx, "id", e.target.value);
   
+  if (!item) return null; // Safety check
+
   return (
     <tr className={`group ${rowBgClass} transition-colors`}>
       <td className="px-1 py-0 font-semibold text-gray-700 border-r border-gray-200 align-top" style={{ minWidth: "40px", width: "40px" }}>
         <input 
           type="text" 
-          value={item.id} 
+          value={item.id || ""} 
           onChange={handleIdChange} 
           disabled={!isEditing}
           className={"w-full bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-gray-500 rounded px-1 py-1 text-xs" + (item.isHeading ? " font-bold" : "")} 
@@ -474,6 +519,7 @@ function CommentViewer() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newCommentId, setNewCommentId] = useState("");
   const [newCommentLocation, setNewCommentLocation] = useState("");
+  const [saveStatus, setSaveStatus] = useState("idle");
   const [smartPasteContent, setSmartPasteContent] = useState("");
   const commentIdInputRef = useRef(null);
   const [history, setHistory] = useState([]);
@@ -490,8 +536,8 @@ function CommentViewer() {
   const pendingEditRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [editingCommentIds, setEditingCommentIds] = useState(new Set()); // New state for editing
-  const [savingCommentId, setSavingCommentId] = useState(null); // Track saving state per comment
+  const [editingCommentIds, setEditingCommentIds] = useState(new Set());
+  const [savingCommentId, setSavingCommentId] = useState(null);
 
   const debouncedSearchQuery = useDebounce(searchQuery, DEBOUNCE_DELAY);
 
@@ -633,7 +679,6 @@ function CommentViewer() {
     }
   }, []);
 
-  // Stable callbacks for memoized rows
   const toggleCellImplemented = useCallback((commentId, itemIndex, column) => {
     setComments((prevComments) => prevComments.map((comment) => {
       if (comment.id === commentId) {
@@ -718,27 +763,22 @@ function CommentViewer() {
     });
   }, []);
 
-  // --- EDIT & SAVE LOGIC ---
   const handleEditComment = useCallback((commentId) => {
     setEditingCommentIds(prev => new Set(prev).add(commentId));
   }, []);
 
   const handleSaveComment = useCallback(async (commentId) => {
     if (!officeReady) return;
-    
-    // Find the comment data in React state
     const commentData = comments.find(c => c.id === commentId);
     if (!commentData) return;
 
     setSavingCommentId(commentId);
     try {
       await Word.run(async (context) => {
-        // Load only what we need: content of items
         const wordComments = context.document.body.getComments();
         wordComments.load("items/content");
         await context.sync();
 
-        // Scan for the matching ID in Word's comments
         let targetWordComment = null;
         for (let i = 0; i < wordComments.items.length; i++) {
             const wc = wordComments.items[i];
@@ -751,12 +791,9 @@ function CommentViewer() {
         }
 
         if (targetWordComment) {
-            // Update the content
             const newContent = commentId + "|||" + JSON.stringify({ items: commentData.items });
             targetWordComment.content = newContent;
             await context.sync();
-            
-            // Remove from editing set only on success
             setEditingCommentIds(prev => {
                 const next = new Set(prev);
                 next.delete(commentId);
@@ -774,11 +811,10 @@ function CommentViewer() {
     }
   }, [comments, officeReady]);
 
-  // OPTIMIZED BATCH LOADING
   async function loadCommentsFromWord() {
     setLoading(true);
     setLoadingProgress(0);
-    setEditingCommentIds(new Set()); // Reset editing state on refresh
+    setEditingCommentIds(new Set());
     try {
       await Word.run(async (context) => {
         const wordComments = context.document.body.getComments();
@@ -898,7 +934,6 @@ function CommentViewer() {
         setComments(updatedComments);
         saveToHistory(updatedComments);
         setExpandedComments((prev) => new Set([...prev, newCommentId]));
-        // Auto-enable editing for new comment
         setEditingCommentIds(prev => new Set(prev).add(newCommentId));
         setShowCreateDialog(false);
         setNewCommentId("");
@@ -1332,13 +1367,18 @@ function CommentViewer() {
 
       <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-3 py-1 text-xs text-gray-500 flex justify-between">
         <span>{comments.length} comment{comments.length !== 1 ? "s" : ""} • {comments.reduce((acc, c) => acc + c.items.length, 0)} total items</span>
-        <span>v58</span>
+        <span>v59</span>
       </div>
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<CommentViewer />);
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <ErrorBoundary>
+    <CommentViewer />
+  </ErrorBoundary>
+);
 </script>
 </body>
 </html>
